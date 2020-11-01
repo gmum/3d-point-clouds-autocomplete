@@ -1,0 +1,119 @@
+{
+    "results_root": "/3d_point_cloud/results",
+    "arch": "vae",
+    "clean_results_dir": false,
+
+    "cuda": true,
+    "gpu": 0,
+
+    "reconstruction_loss": "chamfer",
+    "dataset": "shapenet",
+    "data_dir": "/3d_point_cloud/dataset/shapenet",
+
+    "classes": [],
+    "reconstruction_coef": 0.05,
+
+    "seed": 2018,
+    "z_size": 2048,
+
+    "metrics": {
+        "distribution": "normal",
+        "beta_a": 0.01,
+        "beta_b": 0.01,
+        "normal_mu": 0.0,
+        "normal_std": 0.015,
+        "jsd_how_many_last_epochs": -1
+    },
+
+    "model": {
+        "HN": {
+            "use_bias": true,
+            "relu_slope": 0.2
+        },
+        "E": {
+            "use_bias": true,
+            "relu_slope": 0.2
+        },
+        "TN": {
+            "use_bias": true,
+            "relu_slope": 0.2,
+            "freeze_layers_learning": false,
+            "layer_out_channels": [32, 64, 128, 64]
+        }
+    },
+
+    "target_network_input": {
+        "normalization": {
+            "enable": true,
+            "type": "progressive",
+            "epoch": 100
+        }
+    },
+
+    "experiments": {
+
+        "interpolation": {
+            "execute": true,
+            "amount": 5,
+            "transitions": 10
+        },
+
+        "interpolation_between_two_points": {
+            "execute": true,
+            "amount": 30,
+            "transitions": 21,
+            "image_points": 1000
+        },
+
+        "reconstruction": {
+            "execute": true,
+            "amount": 5
+        },
+
+        "sphere": {
+            "execute": true,
+            "amount": 10,
+            "image_points": 10240,
+            "start": 2.0,
+            "end": 4.0,
+            "transitions": 21
+        },
+
+        "sphere_triangles": {
+            "execute": true,
+            "amount": 10,
+            "method": "edge",
+            "depth": 2,
+            "start": 0.5,
+            "end": 1.5,
+            "transitions": 21
+        },
+
+        "sphere_triangles_interpolation": {
+            "execute": true,
+            "amount": 10,
+            "method": "edge",
+            "depth": 2,
+            "coefficient": 1.5,
+            "transitions": 20
+        },
+
+        "different_number_of_points": {
+            "execute": true,
+            "amount": 5,
+            "image_points": [10, 100, 1000, 2048, 10000]
+        },
+
+        "fixed": {
+            "execute": true,
+            "mean": 0.0,
+            "std": 0.015,
+            "amount": 64,
+            "triangulation": {
+                "execute": true,
+                "method": "edge",
+                "depth": 2
+            }
+        }
+    }
+}
