@@ -157,7 +157,7 @@ def main(config):
         log.debug("Epoch: %s" % epoch)
 
         if config['use_telegram_logging']:
-            tg_log.log("Epoch: %s" % epoch)
+            tg_log.log("%s\nEpoch: %s" % (start_epoch_time, epoch))
 
         hyper_network.train()
         encoder.train()
@@ -262,6 +262,9 @@ def main(config):
             np.save(join(metrics_path, f'{epoch:05}_E'), np.array(losses_e))
             np.save(join(metrics_path, f'{epoch:05}_KLD'), np.array(losses_kld))
             np.save(join(metrics_path, f'{epoch:05}_EG'), np.array(losses_eg))
+
+            if config['use_telegram_logging']:
+                tg_log.log("Epoch: %s saved" % epoch)
 
 
 if __name__ == '__main__':
