@@ -2,11 +2,15 @@
     "results_root": "/3d_point_cloud/results",
     "arch": "vae",
     "clean_results_dir": false,
-    "is_parallel": true,
-    "gpu_ids": [0,1],
 
     "cuda": true,
     "gpu": 0,
+    "is_parallel": false,
+    "device_ids": [0,1],
+
+    "use_telegram_logging": true,
+    "tg_bot_token": '',
+    "tg_chat_id": '',
 
     "reconstruction_loss": "chamfer",
     "dataset": "shapenet",

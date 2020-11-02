@@ -16,6 +16,7 @@ import torch.utils.data
 from torch.utils.data import DataLoader
 from models import aae
 from utils.pcutil import plot_3d_point_cloud
+from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed
 from utils.points import generate_points
 
@@ -51,6 +52,11 @@ def main(config):
 
     setup_logging(results_dir)
     log = logging.getLogger('vae')
+
+    tg_log = None
+
+    if config['use_telegram_logging']:
+        tg_log = TelegramLogger(config['tg_bot_token'], config['tg_chat_id'])
 
     device = cuda_setup(config['cuda'], config['gpu'])
     log.info(f'Device variable: {device}')
@@ -148,7 +154,11 @@ def main(config):
     target_network_input = None
     for epoch in range(starting_epoch, config['max_epochs'] + 1):
         start_epoch_time = datetime.now()
-        log.info("Epoch: %s" % epoch)
+        log.debug("Epoch: %s" % epoch)
+
+        if config['use_telegram_logging']:
+            tg_log.log("Epoch: %s" % epoch)
+
         hyper_network.train()
         encoder.train()
 
@@ -207,6 +217,15 @@ def main(config):
             f'Loss_E: {total_loss_kld / i:.4f} '
             f'Time: {datetime.now() - start_epoch_time}'
         )
+
+        if config['use_telegram_logging']:
+            tg_log.log(
+                f'[{epoch}/{config["max_epochs"]}] '
+                f'Loss_ALL: {total_loss_all / i:.4f} '
+                f'Loss_R: {total_loss_r / i:.4f} '
+                f'Loss_E: {total_loss_kld / i:.4f} '
+                f'Time: {datetime.now() - start_epoch_time}'
+            )
 
         losses_e.append(total_loss_r)
         losses_kld.append(total_loss_kld)
