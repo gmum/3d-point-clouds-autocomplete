@@ -2,6 +2,8 @@
     "results_root": "/3d_point_cloud/results",
     "arch": "vae",
     "clean_results_dir": false,
+    "is_parallel": true,
+    "gpu_ids": [0,1],
 
     "cuda": true,
     "gpu": 0,

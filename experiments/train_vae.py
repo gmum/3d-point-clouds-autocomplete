@@ -88,12 +88,22 @@ def main(config):
     hyper_network = aae.HyperNetwork(config, device).to(device)
     encoder = aae.Encoder(config).to(device)
 
+    if torch.cuda.device_count() > 1 and config['is_parallel']:
+        hyper_network = torch.nn.DataParallel(hyper_network, device_ids=config['device_ids'])
+        encoder = torch.nn.DataParallel(encoder, device_ids=config['device_ids'])
+
+    hyper_network.to(device)
+    encoder.to(device)
+
     hyper_network.apply(weights_init)
     encoder.apply(weights_init)
 
     if config['reconstruction_loss'].lower() == 'chamfer':
         from losses.champfer_loss import ChamferLoss
-        reconstruction_loss = ChamferLoss().to(device)
+        chamfer_loss = ChamferLoss()
+        if torch.cuda.device_count() > 1 and config['is_parallel']:
+            chamfer_loss = torch.nn.DataParallel(chamfer_loss, device_ids=config['device_ids'])
+        reconstruction_loss = chamfer_loss.to(device)
     elif config['reconstruction_loss'].lower() == 'earth_mover':
         # from utils.metrics import earth_mover_distance
         # reconstruction_loss = earth_mover_distance
