@@ -220,10 +220,10 @@ def main(config):
 
         if config['use_telegram_logging']:
             tg_log.log(
-                f'[{epoch}/{config["max_epochs"]}] '
-                f'Loss_ALL: {total_loss_all / i:.4f} '
-                f'Loss_R: {total_loss_r / i:.4f} '
-                f'Loss_E: {total_loss_kld / i:.4f} '
+                f'[{epoch}/{config["max_epochs"]}]\n'
+                f'Loss_ALL: {total_loss_all / i:.4f}\n'
+                f'Loss_R: {total_loss_r / i:.4f}\n'
+                f'Loss_E: {total_loss_kld / i:.4f}\n'
                 f'Time: {datetime.now() - start_epoch_time}'
             )
 
