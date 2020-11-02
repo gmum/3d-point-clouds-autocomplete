@@ -2,3 +2,4 @@
 settings/*json
 start.sh
 *__pycache__
+data

@@ -67,7 +67,8 @@ def main(config):
     if dataset_name == 'shapenet':
         from datasets.shapenet import ShapeNetDataset
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
-                                  classes=config['classes'])
+                                  classes=config['classes'],
+                                  is_sliced=True)
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
@@ -137,7 +138,7 @@ def main(config):
     target_network_input = None
     for epoch in range(starting_epoch, config['max_epochs'] + 1):
         start_epoch_time = datetime.now()
-        log.debug("Epoch: %s" % epoch)
+        log.info("Epoch: %s" % epoch)
         hyper_network.train()
         encoder.train()
 
@@ -146,28 +147,33 @@ def main(config):
         total_loss_kld = 0.0
         for i, point_data in enumerate(points_dataloader, 1):
 
-            X, _ = point_data
+            X, target_X, _ = point_data
+
             X = X.to(device)
+            target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
             if X.size(-1) == 3:
                 X.transpose_(X.dim() - 2, X.dim() - 1)
 
+            if target_X.size(-1) == 3:
+                target_X.transpose_(X.dim() - 2, target_X.dim() - 1)
+
             codes, mu, logvar = encoder(X)
             target_networks_weights = hyper_network(codes)
 
-            X_rec = torch.zeros(X.shape).to(device)
+            X_rec = torch.zeros(target_X.shape).to(device)
             for j, target_network_weights in enumerate(target_networks_weights):
                 target_network = aae.TargetNetwork(config, target_network_weights).to(device)
 
                 if not config['target_network_input']['constant'] or target_network_input is None:
-                    target_network_input = generate_points(config=config, epoch=epoch, size=(X.shape[2], X.shape[1]))
+                    target_network_input = generate_points(config=config, epoch=epoch, size=(target_X.shape[2], target_X.shape[1]))
 
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
             loss_r = torch.mean(
                 config['reconstruction_coef'] *
-                reconstruction_loss(X.permute(0, 2, 1) + 0.5,
+                reconstruction_loss(target_X.permute(0, 2, 1) + 0.5,
                                     X_rec.permute(0, 2, 1) + 0.5))
 
             loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
@@ -199,7 +205,7 @@ def main(config):
         #
         # Save intermediate results
         #
-        X = X.cpu().numpy()
+        target_X = target_X.cpu().numpy()
         X_rec = X_rec.detach().cpu().numpy()
 
         for k in range(min(5, X_rec.shape[0])):
@@ -208,7 +214,7 @@ def main(config):
             fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_reconstructed.png'))
             plt.close(fig)
 
-            fig = plot_3d_point_cloud(X[k][0], X[k][1], X[k][2], in_u_sphere=True, show=False)
+            fig = plot_3d_point_cloud(target_X[k][0], target_X[k][1], target_X[k][2], in_u_sphere=True, show=False)
             fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_real.png'))
             plt.close(fig)
 

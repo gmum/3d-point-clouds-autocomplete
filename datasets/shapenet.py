@@ -1,5 +1,6 @@
-import urllib
+import os
 import shutil
+import urllib
 from os import listdir, makedirs, remove
 from os.path import exists, join
 from zipfile import ZipFile
@@ -7,28 +8,29 @@ from zipfile import ZipFile
 import pandas as pd
 from torch.utils.data import Dataset
 
+from datasets.dataset_generator import generate_item, quick_save_ply_file
 from utils.plyfile import load_ply
 
 synth_id_to_category = {
-    '02691156': 'airplane',  '02773838': 'bag',        '02801938': 'basket',
-    '02808440': 'bathtub',   '02818832': 'bed',        '02828884': 'bench',
-    '02834778': 'bicycle',   '02843684': 'birdhouse',  '02871439': 'bookshelf',
-    '02876657': 'bottle',    '02880940': 'bowl',       '02924116': 'bus',
-    '02933112': 'cabinet',   '02747177': 'can',        '02942699': 'camera',
-    '02954340': 'cap',       '02958343': 'car',        '03001627': 'chair',
-    '03046257': 'clock',     '03207941': 'dishwasher', '03211117': 'monitor',
-    '04379243': 'table',     '04401088': 'telephone',  '02946921': 'tin_can',
-    '04460130': 'tower',     '04468005': 'train',      '03085013': 'keyboard',
-    '03261776': 'earphone',  '03325088': 'faucet',     '03337140': 'file',
-    '03467517': 'guitar',    '03513137': 'helmet',     '03593526': 'jar',
-    '03624134': 'knife',     '03636649': 'lamp',       '03642806': 'laptop',
-    '03691459': 'speaker',   '03710193': 'mailbox',    '03759954': 'microphone',
+    '02691156': 'airplane', '02773838': 'bag', '02801938': 'basket',
+    '02808440': 'bathtub', '02818832': 'bed', '02828884': 'bench',
+    '02834778': 'bicycle', '02843684': 'birdhouse', '02871439': 'bookshelf',
+    '02876657': 'bottle', '02880940': 'bowl', '02924116': 'bus',
+    '02933112': 'cabinet', '02747177': 'can', '02942699': 'camera',
+    '02954340': 'cap', '02958343': 'car', '03001627': 'chair',
+    '03046257': 'clock', '03207941': 'dishwasher', '03211117': 'monitor',
+    '04379243': 'table', '04401088': 'telephone', '02946921': 'tin_can',
+    '04460130': 'tower', '04468005': 'train', '03085013': 'keyboard',
+    '03261776': 'earphone', '03325088': 'faucet', '03337140': 'file',
+    '03467517': 'guitar', '03513137': 'helmet', '03593526': 'jar',
+    '03624134': 'knife', '03636649': 'lamp', '03642806': 'laptop',
+    '03691459': 'speaker', '03710193': 'mailbox', '03759954': 'microphone',
     '03761084': 'microwave', '03790512': 'motorcycle', '03797390': 'mug',
-    '03928116': 'piano',     '03938244': 'pillow',     '03948459': 'pistol',
-    '03991062': 'pot',       '04004475': 'printer',    '04074963': 'remote_control',
-    '04090263': 'rifle',     '04099429': 'rocket',     '04225987': 'skateboard',
-    '04256520': 'sofa',      '04330267': 'stove',      '04530566': 'vessel',
-    '04554684': 'washer',    '02858304': 'boat',       '02992529': 'cellphone'
+    '03928116': 'piano', '03938244': 'pillow', '03948459': 'pistol',
+    '03991062': 'pot', '04004475': 'printer', '04074963': 'remote_control',
+    '04090263': 'rifle', '04099429': 'rocket', '04225987': 'skateboard',
+    '04256520': 'sofa', '04330267': 'stove', '04530566': 'vessel',
+    '04554684': 'washer', '02858304': 'boat', '02992529': 'cellphone'
 }
 
 category_to_synth_id = {v: k for k, v in synth_id_to_category.items()}
@@ -37,7 +39,7 @@ synth_id_to_number = {k: i for i, k in enumerate(synth_id_to_category.keys())}
 
 class ShapeNetDataset(Dataset):
     def __init__(self, root_dir='/home/datasets/shapenet', classes=[],
-                 transform=None, split='train'):
+                 transform=None, split='train', is_sliced=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
@@ -47,10 +49,13 @@ class ShapeNetDataset(Dataset):
         self.root_dir = root_dir
         self.transform = transform
         self.split = split
+        self.is_sliced = is_sliced
 
         self._maybe_download_data()
+        self._maybe_make_slices()
 
-        pc_df = self._get_names()
+        pc_df = self._get_names(self.root_dir + '/slices') if self.is_sliced else self._get_names(self.root_dir)
+
         if classes:
             if classes[0] not in synth_id_to_category.keys():
                 classes = [category_to_synth_id[c] for c in classes]
@@ -58,9 +63,16 @@ class ShapeNetDataset(Dataset):
         else:
             classes = synth_id_to_category.keys()
 
-        self.point_clouds_names_train = pd.concat([pc_df[pc_df['category'] == c][:int(0.85*len(pc_df[pc_df['category'] == c]))].reset_index(drop=True) for c in classes])
-        self.point_clouds_names_valid = pd.concat([pc_df[pc_df['category'] == c][int(0.85*len(pc_df[pc_df['category'] == c])):int(0.9*len(pc_df[pc_df['category'] == c]))].reset_index(drop=True) for c in classes])
-        self.point_clouds_names_test = pd.concat([pc_df[pc_df['category'] == c][int(0.9*len(pc_df[pc_df['category'] == c])):].reset_index(drop=True) for c in classes])
+        self.point_clouds_names_train = pd.concat(
+            [pc_df[pc_df['category'] == c][:int(0.85 * len(pc_df[pc_df['category'] == c]))].reset_index(drop=True) for c
+             in classes])
+        self.point_clouds_names_valid = pd.concat([pc_df[pc_df['category'] == c][
+                                                   int(0.85 * len(pc_df[pc_df['category'] == c])):int(
+                                                       0.9 * len(pc_df[pc_df['category'] == c]))].reset_index(drop=True)
+                                                   for c in classes])
+        self.point_clouds_names_test = pd.concat(
+            [pc_df[pc_df['category'] == c][int(0.9 * len(pc_df[pc_df['category'] == c])):].reset_index(drop=True) for c
+             in classes])
 
     def __len__(self):
         if self.split == 'train':
@@ -85,18 +97,26 @@ class ShapeNetDataset(Dataset):
 
         pc_category, pc_filename = pc_names.iloc[idx].values
 
-        pc_filepath = join(self.root_dir, pc_category, pc_filename)
-        sample = load_ply(pc_filepath)
+        if self.is_sliced:
+            sample = load_ply(join(self.root_dir, 'slices', pc_category, pc_filename))
+            target = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
 
-        if self.transform:
-            sample = self.transform(sample)
+            if self.transform:
+                sample = self.transform(sample)
+                target = self.transform(target)
 
-        return sample, synth_id_to_number[pc_category]
+            return sample[:1024], target, synth_id_to_number[pc_category]
+        else:
+            sample = load_ply(join(self.root_dir, pc_category, pc_filename))
+            if self.transform:
+                sample = self.transform(sample)
 
-    def _get_names(self) -> pd.DataFrame:
+            return sample, synth_id_to_number[pc_category]
+
+    def _get_names(self, path) -> pd.DataFrame:
         filenames = []
         for category_id in synth_id_to_category.keys():
-            for f in listdir(join(self.root_dir, category_id)):
+            for f in listdir(join(path, category_id)):
                 if f not in ['.DS_Store']:
                     filenames.append((category_id, f))
         return pd.DataFrame(filenames, columns=['category', 'filename'])
@@ -132,3 +152,22 @@ class ShapeNetDataset(Dataset):
 
         shutil.rmtree(extracted_dir)
 
+    def _maybe_make_slices(self):
+        if exists(self.root_dir + '/slices'):
+            return
+
+        pc_df = self._get_names(self.root_dir)
+        for category in synth_id_to_category.keys():
+            os.makedirs(self.root_dir + '/slices/' + category, exist_ok=True)
+
+        for _, row in pc_df.iterrows():
+            print(_, row['category'])
+            pc_filepath = join(self.root_dir, row['category'], row['filename'])
+            points = load_ply(pc_filepath)
+
+            if self.transform:
+                points = self.transform(points)
+
+            for i in range(4):
+                quick_save_ply_file(generate_item(points, min_partition=0.4), self.root_dir + '/slices/' +
+                                    row['category'] + '/' + str(i) + '~' + row['filename'])

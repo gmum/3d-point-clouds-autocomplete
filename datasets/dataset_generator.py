@@ -1,4 +1,3 @@
-from datasets.shapenet import ShapeNetDataset
 import numpy as np
 import pptk
 
@@ -51,7 +50,7 @@ class HyperPlane(object):
 
 
 def generate_item(points_cloud, min_partition=0.4):
-    points = points_cloud[0]
+    points = points_cloud
     current_partition = 0
 
     points_under_plane = None
@@ -64,17 +63,5 @@ def generate_item(points_cloud, min_partition=0.4):
         part = len(points_under_plane) / len(points)
         current_partition = np.min([part, 1. - part])
 
-    show_3d_cloud(points)
-    show_3d_cloud(points_under_plane)
-    show_3d_cloud(points_above_plane)
+    return points_under_plane if len(points_under_plane) > len(points_above_plane) else points_above_plane
 
-    # quick_save_ply_file(points, "full.ply")
-    # quick_save_ply_file(points_above_plane, "above.ply")
-
-
-if __name__ == '__main__':
-    shape_net_dataset = ShapeNetDataset(root_dir="/3d_point_cloud/dataset/shapenet")
-
-    # show_3d_cloud(load_ply("above.ply"))
-
-    generate_item(shape_net_dataset[0])
