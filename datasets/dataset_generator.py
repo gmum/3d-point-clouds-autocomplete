@@ -1,8 +1,8 @@
 import numpy as np
-import pptk
 
 
 def show_3d_cloud(points_cloud):
+    import pptk
     pptk.viewer(points_cloud).set(show_axis=False)
 
 
