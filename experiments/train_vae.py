@@ -234,6 +234,7 @@ def main(config):
         #
         # Save intermediate results
         #
+        X = X.cpu().numpy()
         target_X = target_X.cpu().numpy()
         X_rec = X_rec.detach().cpu().numpy()
 
@@ -245,6 +246,10 @@ def main(config):
 
             fig = plot_3d_point_cloud(target_X[k][0], target_X[k][1], target_X[k][2], in_u_sphere=True, show=False)
             fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_real.png'))
+            plt.close(fig)
+
+            fig = plot_3d_point_cloud(X[k][0], X[k][1], X[k][2], in_u_sphere=True, show=False, title=str(epoch))
+            fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_cut.png'))
             plt.close(fig)
 
         if config['clean_weights_dir']:
