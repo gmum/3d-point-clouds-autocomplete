@@ -53,7 +53,8 @@ def main(config):
     if dataset_name == 'shapenet':
         from datasets.shapenet import ShapeNetDataset
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
-                                  classes=config['classes'])
+                                  classes=config['classes'],
+                                  is_sliced=True)
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
@@ -61,8 +62,8 @@ def main(config):
     log.info("Selected {} classes. Loaded {} samples.".format(
         'all' if not config['classes'] else ','.join(config['classes']), len(dataset)))
 
-    points_dataloader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=8, drop_last=True,
-                                   pin_memory=True)
+    points_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8,
+                                   drop_last=True, pin_memory=True)
 
     #
     # Models
@@ -98,26 +99,35 @@ def main(config):
 
     with torch.no_grad():
         for i, point_data in enumerate(points_dataloader, 1):
-            X, _ = point_data
+
+            if i % 1000 == 0:
+                print(i)
+
+            X, target_X, _ = point_data
+
             X = X.to(device)
+            target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
             if X.size(-1) == 3:
                 X.transpose_(X.dim() - 2, X.dim() - 1)
 
-            x.append(X)
+            if target_X.size(-1) == 3:
+                target_X.transpose_(X.dim() - 2, target_X.dim() - 1)
+
+            x.append(target_X)
             codes, mu, logvar = encoder(X)
             target_networks_weights = hyper_network(codes)
 
-            X_rec = torch.zeros(X.shape).to(device)
+            X_rec = torch.zeros(target_X.shape).to(device)
             for j, target_network_weights in enumerate(target_networks_weights):
                 target_network = aae.TargetNetwork(config, target_network_weights).to(device)
-                target_network_input = generate_points(config=config, epoch=epoch, size=(X.shape[2], X.shape[1]))
+                target_network_input = generate_points(config=config, epoch=epoch, size=(target_X.shape[2], target_X.shape[1]))
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
             loss_e = torch.mean(
                 config['reconstruction_coef'] *
-                reconstruction_loss(X.permute(0, 2, 1) + 0.5,
+                reconstruction_loss(target_X.permute(0, 2, 1) + 0.5,
                                     X_rec.permute(0, 2, 1) + 0.5))
 
             loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
