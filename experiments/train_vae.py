@@ -40,6 +40,12 @@ def weights_init(m):
             torch.nn.init.constant_(m.bias, 0)
 
 
+def save_plot(X, epoch, k, results_dir, t):
+    fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}: {epoch}')
+    fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_{t}.png'))
+    plt.close(fig)
+
+
 def main(config):
     set_seed(config['seed'])
 
@@ -92,17 +98,16 @@ def main(config):
     # Models
     #
     hyper_network = aae.HyperNetwork(config, device).to(device)
-    encoder = aae.Encoder(config).to(device)
+    encoder = aae.EncoderForRandomPoints(config).to(device)
+    real_data_encoder = aae.EncoderForRealPoints(config).to(device)
 
     if torch.cuda.device_count() > 1 and config['is_parallel']:
         hyper_network = torch.nn.DataParallel(hyper_network, device_ids=config['device_ids'])
         encoder = torch.nn.DataParallel(encoder, device_ids=config['device_ids'])
 
-    hyper_network.to(device)
-    encoder.to(device)
-
     hyper_network.apply(weights_init)
     encoder.apply(weights_init)
+    real_data_encoder.apply(weights_init)
 
     if config['reconstruction_loss'].lower() == 'chamfer':
         from losses.champfer_loss import ChamferLoss
@@ -123,7 +128,9 @@ def main(config):
     # Optimizers
     #
     e_hn_optimizer = getattr(optim, config['optimizer']['E_HN']['type'])
-    e_hn_optimizer = e_hn_optimizer(chain(encoder.parameters(), hyper_network.parameters()),
+    e_hn_optimizer = e_hn_optimizer(chain(encoder.parameters(),
+                                          real_data_encoder.parameters(),
+                                          hyper_network.parameters()),
                                     **config['optimizer']['E_HN']['hyperparams'])
 
     log.info("Starting epoch: %s" % starting_epoch)
@@ -133,7 +140,8 @@ def main(config):
             join(weights_path, f'{starting_epoch - 1:05}_G.pth')))
         encoder.load_state_dict(torch.load(
             join(weights_path, f'{starting_epoch - 1:05}_E.pth')))
-
+        real_data_encoder.load_state_dict(torch.load(
+            join(weights_path, f'{starting_epoch - 1:05}_ER.pth')))
         e_hn_optimizer.load_state_dict(torch.load(
             join(weights_path, f'{starting_epoch - 1:05}_EGo.pth')))
 
@@ -161,29 +169,33 @@ def main(config):
 
         hyper_network.train()
         encoder.train()
+        real_data_encoder.train()
 
         total_loss_all = 0.0
         total_loss_r = 0.0
         total_loss_kld = 0.0
         for i, point_data in enumerate(points_dataloader, 1):
 
-            X, target_X, _ = point_data
+            real_X, remaining_X, target_X, _ = point_data
 
-            X = X.to(device)
+            real_X = real_X.to(device)
+            remaining_X = remaining_X.to(device)
             target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
-            if X.size(-1) == 3:
-                X.transpose_(X.dim() - 2, X.dim() - 1)
+            if real_X.size(-1) == 3:
+                real_X.transpose_(real_X.dim() - 2, real_X.dim() - 1)
+
+            if remaining_X.size(-1) == 3:
+                remaining_X.transpose_(remaining_X.dim() - 2, remaining_X.dim() - 1)
 
             if target_X.size(-1) == 3:
-                target_X.transpose_(X.dim() - 2, target_X.dim() - 1)
+                target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
 
-            codes, mu, logvar = encoder(X)
-            # _, mu, _ = encoder(X) # TODO REWRITE nondeterm
-            # codes concat mu2 # TODO REWRITE
+            real_mu = real_data_encoder(real_X)
+            codes, mu, logvar = encoder(remaining_X)
 
-            target_networks_weights = hyper_network(codes)
+            target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
             X_rec = torch.zeros(target_X.shape).to(device)
             for j, target_network_weights in enumerate(target_networks_weights):
@@ -199,10 +211,11 @@ def main(config):
                 reconstruction_loss(target_X.permute(0, 2, 1) + 0.5,
                                     X_rec.permute(0, 2, 1) + 0.5))
 
-            loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
+            loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
 
             loss_all = loss_r + loss_kld
             e_hn_optimizer.zero_grad()
+            real_data_encoder.zero_grad()
             encoder.zero_grad()
             hyper_network.zero_grad()
 
@@ -237,23 +250,14 @@ def main(config):
         #
         # Save intermediate results
         #
-        X = X.cpu().numpy()
+        real_X = real_X.cpu().numpy()
         target_X = target_X.cpu().numpy()
         X_rec = X_rec.detach().cpu().numpy()
 
         for k in range(min(5, X_rec.shape[0])):
-            fig = plot_3d_point_cloud(X_rec[k][0], X_rec[k][1], X_rec[k][2], in_u_sphere=True, show=False,
-                                      title=str(epoch))
-            fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_reconstructed.png'))
-            plt.close(fig)
-
-            fig = plot_3d_point_cloud(target_X[k][0], target_X[k][1], target_X[k][2], in_u_sphere=True, show=False)
-            fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_real.png'))
-            plt.close(fig)
-
-            fig = plot_3d_point_cloud(X[k][0], X[k][1], X[k][2], in_u_sphere=True, show=False, title=str(epoch))
-            fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_cut.png'))
-            plt.close(fig)
+            save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed')
+            save_plot(target_X[k], epoch, k, results_dir, 'real')
+            save_plot(real_X[k], epoch, k, results_dir, 'cut')
 
         if config['clean_weights_dir']:
             log.debug('Cleaning weights path: %s' % weights_path)
@@ -265,6 +269,7 @@ def main(config):
 
             torch.save(hyper_network.state_dict(), join(weights_path, f'{epoch:05}_G.pth'))
             torch.save(encoder.state_dict(), join(weights_path, f'{epoch:05}_E.pth'))
+            torch.save(real_data_encoder.state_dict(), join(weights_path, f'{epoch:05}_ER.pth'))
             torch.save(e_hn_optimizer.state_dict(), join(weights_path, f'{epoch:05}_EGo.pth'))
 
             np.save(join(metrics_path, f'{epoch:05}_E'), np.array(losses_e))

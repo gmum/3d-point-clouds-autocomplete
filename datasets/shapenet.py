@@ -98,14 +98,16 @@ class ShapeNetDataset(Dataset):
         pc_category, pc_filename = pc_names.iloc[idx].values
 
         if self.is_sliced:
-            sample = load_ply(join(self.root_dir, 'slices', pc_category, pc_filename))
+            real = load_ply(join(self.root_dir, 'slices', 'real', pc_category, pc_filename))
+            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
             target = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
 
             if self.transform:
-                sample = self.transform(sample)
+                real = self.transform(real)
+                remaining = self.transform(remaining)
                 target = self.transform(target)
 
-            return sample, target, synth_id_to_number[pc_category]
+            return real, remaining, target, synth_id_to_number[pc_category]
         else:
             sample = load_ply(join(self.root_dir, pc_category, pc_filename))
             if self.transform:

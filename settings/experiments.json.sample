@@ -16,7 +16,8 @@
     "reconstruction_coef": 0.05,
 
     "seed": 2018,
-    "z_size": 2048,
+    "remaining_size": 1024,
+    "real_size" : 1024,
 
     "metrics": {
         "distribution": "normal",
@@ -57,13 +58,13 @@
         "interpolation": {
             "execute": true,
             "amount": 5,
-            "transitions": 10
+            "transitions": 3
         },
 
         "interpolation_between_two_points": {
             "execute": false,
             "amount": 30,
-            "transitions": 21,
+            "transitions": 3,
             "image_points": 1000
         },
 
@@ -103,7 +104,7 @@
         "different_number_of_points": {
             "execute": false,
             "amount": 5,
-            "image_points": [10, 100, 1000, 2048, 10000]
+            "number_of_points_list": [10, 100, 1000, 2048, 10000]
         },
 
         "fixed": {
@@ -111,7 +112,7 @@
             "mean": 0.0,
             "std": 0.015,
             "amount": 64,
-            "triangulation": {
+            "triangulation_config": {
                 "execute": true,
                 "method": "edge",
                 "depth": 2

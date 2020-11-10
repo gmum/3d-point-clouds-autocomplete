@@ -6,7 +6,7 @@ class HyperNetwork(nn.Module):
     def __init__(self, config, device):
         super().__init__()
 
-        self.z_size = config['z_size']
+        self.input_size = config['remaining_size'] + config['real_size']
         self.use_bias = config['model']['HN']['use_bias']
         self.relu_slope = config['model']['HN']['relu_slope']
         # target network layers out channels
@@ -14,7 +14,7 @@ class HyperNetwork(nn.Module):
         target_network_use_bias = int(config['model']['TN']['use_bias'])
 
         self.model = nn.Sequential(
-            nn.Linear(in_features=self.z_size, out_features=64, bias=self.use_bias),
+            nn.Linear(in_features=self.input_size, out_features=64, bias=self.use_bias),
             nn.ReLU(inplace=True),
 
             nn.Linear(in_features=64, out_features=128, bias=self.use_bias),
@@ -47,7 +47,7 @@ class TargetNetwork(nn.Module):
     def __init__(self, config, weights):
         super().__init__()
 
-        self.z_size = config['z_size']
+        self.z_size = config['remaining_size']
         self.use_bias = config['model']['TN']['use_bias']
         # target network layers out channels
         out_ch = config['model']['TN']['layer_out_channels']
@@ -86,11 +86,11 @@ class TargetNetwork(nn.Module):
         return layer_data, end_index
 
 
-class Encoder(nn.Module):
+class EncoderForRandomPoints(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['z_size']
+        self.z_size = config['remaining_size']
         self.use_bias = config['model']['E']['use_bias']
         self.relu_slope = config['model']['E']['relu_slope']
 
@@ -133,11 +133,49 @@ class Encoder(nn.Module):
         return z, mu, torch.exp(logvar)
 
 
+class EncoderForRealPoints(nn.Module):
+
+    def __init__(self, config):
+        super().__init__()
+
+        self.z_size = config['remaining_size']
+        self.use_bias = config['model']['E']['use_bias']
+        self.relu_slope = config['model']['E']['relu_slope']
+
+        self.conv = nn.Sequential(
+            nn.Conv1d(in_channels=3, out_channels=64, kernel_size=1, bias=self.use_bias),
+            nn.ReLU(inplace=True),
+
+            nn.Conv1d(in_channels=64, out_channels=128, kernel_size=1, bias=self.use_bias),
+            nn.ReLU(inplace=True),
+
+            nn.Conv1d(in_channels=128, out_channels=256, kernel_size=1, bias=self.use_bias),
+            nn.ReLU(inplace=True),
+
+            nn.Conv1d(in_channels=256, out_channels=512, kernel_size=1, bias=self.use_bias),
+            nn.ReLU(inplace=True),
+
+            nn.Conv1d(in_channels=512, out_channels=512, kernel_size=1, bias=self.use_bias),
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(512, 512, bias=True),
+            nn.ReLU(inplace=True)
+        )
+        self.mu_layer = nn.Linear(512, self.z_size, bias=True)
+
+    def forward(self, x):
+        output = self.conv(x)
+        output2 = output.max(dim=2)[0]
+        logit = self.fc(output2)
+        mu = self.mu_layer(logit)
+        return mu
+
+
 class Discriminator(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['z_size']
+        self.z_size = config['remaining_size']
         self.use_bias = config['model']['D']['use_bias']
         self.relu_slope = config['model']['D']['relu_slope']
         self.dropout = config['model']['D']['dropout']

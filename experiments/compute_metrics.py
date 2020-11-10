@@ -63,7 +63,7 @@ def jsd(config, weights_path, device):
 
     # We take 3 times as many samples as there are in test data in order to
     # perform JSD calculation in the same manner as in the reference publication
-    noise = torch.zeros(3 * X.shape[0], config['z_size']).to(device)
+    noise = torch.zeros(3 * X.shape[0], config['remaining_size']).to(device)
 
     results = {}
 
@@ -146,7 +146,7 @@ def minimum_matching_distance(config, weights_path, device):
     # Models
     #
     hyper_network = aae.HyperNetwork(config, device).to(device)
-    encoder = aae.Encoder(config).to(device)
+    encoder = aae.EncoderForRandomPoints(config).to(device)
 
     hyper_network.eval()
     encoder.eval()
@@ -244,7 +244,7 @@ def all_metrics(config, weights_path, device, epoch, jsd_value):
             X.transpose_(X.dim() - 2, X.dim() - 1)
 
         with torch.no_grad():
-            noise = torch.zeros(X.shape[0], config['z_size']).to(device)
+            noise = torch.zeros(X.shape[0], config['remaining_size']).to(device)
             if distribution == 'normal':
                 noise.normal_(config['metrics']['normal_mu'], config['metrics']['normal_std'])
             elif distribution == 'beta':

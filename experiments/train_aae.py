@@ -99,7 +99,7 @@ def main(config):
         encoder = PointNet(config).to(device)
         # PointNet initializes it's own weights during instance creation
     else:
-        encoder = aae.Encoder(config).to(device)
+        encoder = aae.EncoderForRandomPoints(config).to(device)
         encoder.apply(weights_init)
 
     discriminator = aae.Discriminator(config).to(device)
@@ -193,7 +193,7 @@ def main(config):
                 codes, _, _ = encoder(X)
 
             # discriminator training
-            noise = torch.empty(codes.shape[0], config['z_size']).normal_(mean=config['normal_mu'],
+            noise = torch.empty(codes.shape[0], config['remaining_size']).normal_(mean=config['normal_mu'],
                                                                           std=config['normal_std']).to(device)
             synth_logit = discriminator(codes)
             real_logit = discriminator(noise)

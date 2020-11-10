@@ -40,7 +40,7 @@ class PointNetClassification(BaseModel):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['z_size']
+        self.z_size = config['remaining_size']
         self.n_classes = config['n_classes']
         self.pointnet = PointNet(config)
         self.classification = nn.Sequential(
@@ -80,7 +80,7 @@ class PointNet(BaseModel):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['z_size']  # Default PointNet z_size=1024
+        self.z_size = config['remaining_size']  # Default PointNet z_size=1024
         self.binary_point_net = False # (('distribution' in config['z']) and (config['z']['distribution'].lower() in ('beta', 'bernoulli')))
         self.binary_activation = None # config['z']['binary_activation'].lower() if 'binary_activation' in config['z'] else None
 
