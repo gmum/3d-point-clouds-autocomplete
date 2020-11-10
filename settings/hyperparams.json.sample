@@ -6,6 +6,10 @@
     "cuda": true,
     "gpu": 0,
 
+    "use_telegram_logging": false,
+    "tg_bot_token": "",
+    "tg_chat_id": "",
+
     "reconstruction_loss": "chamfer",
 
     "metrics": [],

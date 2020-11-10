@@ -8,10 +8,6 @@
     "is_parallel": false,
     "device_ids": [0,1],
 
-    "use_telegram_logging": true,
-    "tg_bot_token": '',
-    "tg_chat_id": '',
-
     "reconstruction_loss": "chamfer",
     "dataset": "shapenet",
     "data_dir": "/3d_point_cloud/dataset/shapenet",
@@ -65,7 +61,7 @@
         },
 
         "interpolation_between_two_points": {
-            "execute": true,
+            "execute": false,
             "amount": 30,
             "transitions": 21,
             "image_points": 1000
@@ -77,7 +73,7 @@
         },
 
         "sphere": {
-            "execute": true,
+            "execute": false,
             "amount": 10,
             "image_points": 10240,
             "start": 2.0,
@@ -86,7 +82,7 @@
         },
 
         "sphere_triangles": {
-            "execute": true,
+            "execute": false,
             "amount": 10,
             "method": "edge",
             "depth": 2,
@@ -96,7 +92,7 @@
         },
 
         "sphere_triangles_interpolation": {
-            "execute": true,
+            "execute": false,
             "amount": 10,
             "method": "edge",
             "depth": 2,
@@ -105,7 +101,7 @@
         },
 
         "different_number_of_points": {
-            "execute": true,
+            "execute": false,
             "amount": 5,
             "image_points": [10, 100, 1000, 2048, 10000]
         },
