@@ -54,7 +54,7 @@ class ShapeNetDataset(Dataset):
         self._maybe_download_data()
         self._maybe_make_slices()
 
-        pc_df = self._get_names(self.root_dir + '/slices') if self.is_sliced else self._get_names(self.root_dir)
+        pc_df = self._get_names(self.root_dir + '/slices/real') if self.is_sliced else self._get_names(self.root_dir)
 
         if classes:
             if classes[0] not in synth_id_to_category.keys():
@@ -105,7 +105,7 @@ class ShapeNetDataset(Dataset):
                 sample = self.transform(sample)
                 target = self.transform(target)
 
-            return sample[:1024], target, synth_id_to_number[pc_category]
+            return sample, target, synth_id_to_number[pc_category]
         else:
             sample = load_ply(join(self.root_dir, pc_category, pc_filename))
             if self.transform:
@@ -158,8 +158,10 @@ class ShapeNetDataset(Dataset):
 
         pc_df = self._get_names(self.root_dir)
         for category in synth_id_to_category.keys():
-            os.makedirs(self.root_dir + '/slices/' + category, exist_ok=True)
+            os.makedirs(self.root_dir + '/slices/real/' + category, exist_ok=True)
+            os.makedirs(self.root_dir + '/slices/remaining/' + category, exist_ok=True)
 
+        import random
         for _, row in pc_df.iterrows():
             print(_, row['category'])
             pc_filepath = join(self.root_dir, row['category'], row['filename'])
@@ -169,5 +171,9 @@ class ShapeNetDataset(Dataset):
                 points = self.transform(points)
 
             for i in range(4):
-                quick_save_ply_file(generate_item(points, min_partition=0.4), self.root_dir + '/slices/' +
+                real, remaining = generate_item(points)
+
+                quick_save_ply_file(real, self.root_dir + '/slices/real/' +
+                                    row['category'] + '/' + str(i) + '~' + row['filename'])
+                quick_save_ply_file(remaining, self.root_dir + '/slices/remaining/' +
                                     row['category'] + '/' + str(i) + '~' + row['filename'])

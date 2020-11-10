@@ -49,19 +49,14 @@ class HyperPlane(object):
         return "Plane A={}, B={}, C={}, D={}".format(*self.params, self.bias)
 
 
-def generate_item(points_cloud, min_partition=0.4):
-    points = points_cloud
-    current_partition = 0
+def generate_item(points, target_partition_points=1024):
 
-    points_under_plane = None
-    points_above_plane = None
-
-    while current_partition < min_partition:
+    while True:
         under = HyperPlane.get_random_plane().check_point(points) > 0
         points_under_plane = points[under]
-        points_above_plane = points[under == False]
-        part = len(points_under_plane) / len(points)
-        current_partition = np.min([part, 1. - part])
+        points_above_plane = points[~under]
 
-    return points_under_plane if len(points_under_plane) > len(points_above_plane) else points_above_plane
-
+        if target_partition_points == len(points_under_plane):
+            return points_under_plane, points_above_plane
+        if target_partition_points == len(points_above_plane):
+            return points_above_plane, points_under_plane
