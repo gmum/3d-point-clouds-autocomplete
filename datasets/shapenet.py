@@ -8,8 +8,8 @@ from zipfile import ZipFile
 import pandas as pd
 from torch.utils.data import Dataset
 
-from datasets.dataset_generator import generate_item, quick_save_ply_file
 from utils.plyfile import load_ply
+from datasets.dataset_generator import SlicedDatasetGenerator
 
 synth_id_to_category = {
     '02691156': 'airplane', '02773838': 'bag', '02801938': 'basket',
@@ -156,24 +156,12 @@ class ShapeNetDataset(Dataset):
         if exists(self.root_dir + '/slices'):
             return
 
-        pc_df = self._get_names(self.root_dir)
+        print("Generating slices...")
+
         for category in synth_id_to_category.keys():
             os.makedirs(self.root_dir + '/slices/real/' + category, exist_ok=True)
             os.makedirs(self.root_dir + '/slices/remaining/' + category, exist_ok=True)
 
-        import random
-        for _, row in pc_df.iterrows():
-            print(_, row['category'])
-            pc_filepath = join(self.root_dir, row['category'], row['filename'])
-            points = load_ply(pc_filepath)
+        SlicedDatasetGenerator(self.root_dir, self.transform).generate(self._get_names(self.root_dir).iterrows())
 
-            if self.transform:
-                points = self.transform(points)
-
-            for i in range(4):
-                real, remaining = generate_item(points)
-
-                quick_save_ply_file(real, self.root_dir + '/slices/real/' +
-                                    row['category'] + '/' + str(i) + '~' + row['filename'])
-                quick_save_ply_file(remaining, self.root_dir + '/slices/remaining/' +
-                                    row['category'] + '/' + str(i) + '~' + row['filename'])
+        print("Dataset generated")

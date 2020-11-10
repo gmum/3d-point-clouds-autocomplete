@@ -180,6 +180,9 @@ def main(config):
                 target_X.transpose_(X.dim() - 2, target_X.dim() - 1)
 
             codes, mu, logvar = encoder(X)
+            # _, mu, _ = encoder(X) # TODO REWRITE nondeterm
+            # codes concat mu2 # TODO REWRITE
+
             target_networks_weights = hyper_network(codes)
 
             X_rec = torch.zeros(target_X.shape).to(device)

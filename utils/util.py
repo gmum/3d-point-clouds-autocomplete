@@ -99,3 +99,8 @@ def get_distribution_dir(config):
             normed_str = 'normed_progressive_to_epoch_%d' % norm_max_epoch
 
     return '%s%s' % ('uniform', '_' + normed_str if normed_str else '')
+
+
+def show_3d_cloud(points_cloud):
+    import pptk
+    pptk.viewer(points_cloud).set(show_axis=False)
