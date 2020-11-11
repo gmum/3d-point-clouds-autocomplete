@@ -41,7 +41,7 @@ def weights_init(m):
 
 
 def save_plot(X, epoch, k, results_dir, t):
-    fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}: {epoch}')
+    fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}_{k} epoch: {epoch}')
     fig_path = join(results_dir, 'samples', f'{epoch}_{k}_{t}.png')
     fig.savefig(fig_path)
     plt.close(fig)

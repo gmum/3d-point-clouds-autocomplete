@@ -38,7 +38,6 @@ class TelegramLogger(object):
                 ])
             }
             files = {f'image_{i}.png': open(image_path, 'rb') for i, image_path in enumerate(image_paths)}
-            r = requests.post(self._image_url, params=send_data, files=files)
-            print(r.content)
+            requests.post(self._image_url, params=send_data, files=files)
         except Exception:
             pass
