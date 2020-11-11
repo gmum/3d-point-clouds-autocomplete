@@ -138,9 +138,9 @@ class EncoderForRealPoints(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['remaining_size']
-        self.use_bias = config['model']['E']['use_bias']
-        self.relu_slope = config['model']['E']['relu_slope']
+        self.z_size = config['real_size']
+        self.use_bias = config['model']['ER']['use_bias']
+        self.relu_slope = config['model']['ER']['relu_slope']
 
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels=3, out_channels=64, kernel_size=1, bias=self.use_bias),

@@ -42,8 +42,10 @@ def weights_init(m):
 
 def save_plot(X, epoch, k, results_dir, t):
     fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}: {epoch}')
-    fig.savefig(join(results_dir, 'samples', f'{epoch}_{k}_{t}.png'))
+    fig_path = join(results_dir, 'samples', f'{epoch}_{k}_{t}.png')
+    fig.savefig(fig_path)
     plt.close(fig)
+    return fig_path
 
 
 def main(config):
@@ -101,20 +103,13 @@ def main(config):
     encoder = aae.EncoderForRandomPoints(config).to(device)
     real_data_encoder = aae.EncoderForRealPoints(config).to(device)
 
-    if torch.cuda.device_count() > 1 and config['is_parallel']:
-        hyper_network = torch.nn.DataParallel(hyper_network, device_ids=config['device_ids'])
-        encoder = torch.nn.DataParallel(encoder, device_ids=config['device_ids'])
-
     hyper_network.apply(weights_init)
     encoder.apply(weights_init)
     real_data_encoder.apply(weights_init)
 
     if config['reconstruction_loss'].lower() == 'chamfer':
         from losses.champfer_loss import ChamferLoss
-        chamfer_loss = ChamferLoss()
-        if torch.cuda.device_count() > 1 and config['is_parallel']:
-            chamfer_loss = torch.nn.DataParallel(chamfer_loss, device_ids=config['device_ids'])
-        reconstruction_loss = chamfer_loss.to(device)
+        reconstruction_loss = ChamferLoss().to(device)
     elif config['reconstruction_loss'].lower() == 'earth_mover':
         # from utils.metrics import earth_mover_distance
         # reconstruction_loss = earth_mover_distance
@@ -192,8 +187,8 @@ def main(config):
             if target_X.size(-1) == 3:
                 target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
 
-            real_mu = real_data_encoder(real_X)
             codes, mu, logvar = encoder(remaining_X)
+            real_mu = real_data_encoder(real_X)
 
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
@@ -254,10 +249,14 @@ def main(config):
         target_X = target_X.cpu().numpy()
         X_rec = X_rec.detach().cpu().numpy()
 
+        saved_plots = []
         for k in range(min(5, X_rec.shape[0])):
-            save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed')
-            save_plot(target_X[k], epoch, k, results_dir, 'real')
-            save_plot(real_X[k], epoch, k, results_dir, 'cut')
+            saved_plots.append(save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed'))
+            saved_plots.append(save_plot(target_X[k], epoch, k, results_dir, 'real'))
+            saved_plots.append(save_plot(real_X[k], epoch, k, results_dir, 'cut'))
+
+        if config['use_telegram_logging']:
+            tg_log.log_images(saved_plots)
 
         if config['clean_weights_dir']:
             log.debug('Cleaning weights path: %s' % weights_path)

@@ -66,6 +66,10 @@
             "use_bias": true,
             "relu_slope": 0.2
         },
+        "ER": {
+            "use_bias": true,
+            "relu_slope": 0.2
+        },
         "TN": {
             "use_bias": true,
             "relu_slope": 0.2,
