@@ -256,7 +256,7 @@ def main(config):
             saved_plots.append(save_plot(real_X[k], epoch, k, results_dir, 'cut'))
 
         if config['use_telegram_logging']:
-            tg_log.log_images(saved_plots)
+            tg_log.log_images(saved_plots[:9])
 
         if config['clean_weights_dir']:
             log.debug('Cleaning weights path: %s' % weights_path)
