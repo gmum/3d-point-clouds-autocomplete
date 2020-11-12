@@ -114,7 +114,8 @@
             "execute": true,
             "mean": 0.0,
             "std": 0.015,
-            "amount": 64,
+            "amount": 20,
+            "noises_per_item": 3,
             "triangulation_config": {
                 "execute": true,
                 "method": "edge",

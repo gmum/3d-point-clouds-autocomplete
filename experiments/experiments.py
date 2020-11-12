@@ -424,7 +424,7 @@ def different_number_of_points(rand_encoder, real_encoder, hyper_network, device
 
 
 def fixed(rand_encoder, real_encoder, hyper_network, device, target_x, remaining_x, real_x, results_dir, epoch,
-          amount=30, mean=0.0, std=0.015, triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
+          amount=30, mean=0.0, std=0.015, noises_per_item=3, triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
     log.info("Fixed")
     target_x = target_x[:amount].cpu().numpy()
 
@@ -432,41 +432,42 @@ def fixed(rand_encoder, real_encoder, hyper_network, device, target_x, remaining
     mu_ar = real_encoder(real_x)
     real_x = real_x.cpu().numpy()
 
-    fixed_noise = torch.zeros(amount, target_x.shape[2] - real_x.shape[2]).normal_(mean=mean, std=std).to(device)
+    for i in range(noises_per_item):
+        fixed_noise = torch.zeros(amount, target_x.shape[2] - real_x.shape[2]).normal_(mean=mean, std=std).to(device)
 
-    weights_fixed = hyper_network(torch.cat([fixed_noise, mu_ar], 1))
+        weights_fixed = hyper_network(torch.cat([fixed_noise, mu_ar], 1))
 
-    for j, weights in enumerate(weights_fixed):
-        target_network = aae.TargetNetwork(config, weights).to(device)
+        for j, weights in enumerate(weights_fixed):
+            target_network = aae.TargetNetwork(config, weights).to(device)
 
-        target_network_input = generate_points(config=config, epoch=epoch, size=(target_x.shape[2], target_x.shape[1]))
-        fixed_rec = torch.transpose(target_network(target_network_input.to(device)), 0, 1).cpu().numpy()
-        np.save(join(results_dir, 'fixed', f'{j}_target_network_input'), np.array(target_network_input))
-        np.save(join(results_dir, 'fixed', f'{j}_fixed_reconstruction'), fixed_rec)
-
-        fig = plot_3d_point_cloud(fixed_rec[0], fixed_rec[1], fixed_rec[2], in_u_sphere=True, show=False)
-        fig.savefig(join(results_dir, 'fixed', f'{j}_fixed_reconstructed.png'))
-        plt.close(fig)
-
-        if triangulation_config['execute']:
-            from utils.sphere_triangles import generate
-
-            target_network_input, triangulation = generate(triangulation_config['method'], triangulation_config['depth'])
-
-            with open(join(results_dir, 'fixed', f'{j}_triangulation.pickle'), 'wb') as triangulation_file:
-                pickle.dump(triangulation, triangulation_file)
-
+            target_network_input = generate_points(config=config, epoch=epoch, size=(target_x.shape[2], target_x.shape[1]))
             fixed_rec = torch.transpose(target_network(target_network_input.to(device)), 0, 1).cpu().numpy()
-            np.save(join(results_dir, 'fixed', f'{j}_target_network_input_triangulation'),
-                    np.array(target_network_input))
-            np.save(join(results_dir, 'fixed', f'{j}_fixed_reconstruction_triangulation'), fixed_rec)
+            np.save(join(results_dir, 'fixed', f'{j}_{i}_target_network_input'), np.array(target_network_input))
+            np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstruction'), fixed_rec)
 
             fig = plot_3d_point_cloud(fixed_rec[0], fixed_rec[1], fixed_rec[2], in_u_sphere=True, show=False)
-            fig.savefig(join(results_dir, 'fixed', f'{j}_fixed_reconstructed_triangulation.png'))
+            fig.savefig(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstructed.png'))
             plt.close(fig)
 
-        np.save(join(results_dir, 'fixed', f'{j}_fixed_noise'), np.array(fixed_noise[j].cpu()))
-        np.save(join(results_dir, 'fixed', f'{j}_real_x_part'), real_x[j])
+            if triangulation_config['execute']:
+                from utils.sphere_triangles import generate
+
+                target_network_input, triangulation = generate(triangulation_config['method'], triangulation_config['depth'])
+
+                with open(join(results_dir, 'fixed', f'{j}_{i}_triangulation.pickle'), 'wb') as triangulation_file:
+                    pickle.dump(triangulation, triangulation_file)
+
+                fixed_rec = torch.transpose(target_network(target_network_input.to(device)), 0, 1).cpu().numpy()
+                np.save(join(results_dir, 'fixed', f'{j}_{i}_target_network_input_triangulation'),
+                        np.array(target_network_input))
+                np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstruction_triangulation'), fixed_rec)
+
+                fig = plot_3d_point_cloud(fixed_rec[0], fixed_rec[1], fixed_rec[2], in_u_sphere=True, show=False)
+                fig.savefig(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstructed_triangulation.png'))
+                plt.close(fig)
+
+            np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_noise'), np.array(fixed_noise[j].cpu()))
+            np.save(join(results_dir, 'fixed', f'{j}_{i}_real_x_part'), real_x[j])
 
 
 experiment_functions_dict = {
