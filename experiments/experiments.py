@@ -62,8 +62,8 @@ def main(config):
     log.info("Selected {} classes. Loaded {} samples.".format(
         'all' if not config['classes'] else ','.join(config['classes']), len(dataset)))
 
-    points_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8,
-                                   drop_last=True, pin_memory=True)
+    points_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True,
+                                   num_workers=config["num_workers"], drop_last=True, pin_memory=True)
 
     #
     # Models
@@ -129,8 +129,8 @@ def main(config):
                 remaining_x.append(remaining_X)
                 target_x.append(target_X)
 
-            real_mu = real_data_encoder(real_X)
             codes, mu, logvar = encoder(remaining_X)
+            real_mu = real_data_encoder(real_X)
 
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
@@ -164,7 +164,7 @@ def main(config):
         target_x = torch.cat(target_x)
 
         for experiment_name, experiment_dict in config['experiments'].items():
-            if experiment_dict.pop('execute', False) and experiment_name == 'fixed':
+            if experiment_dict.pop('execute', False):
                 experiment_functions_dict[experiment_name](encoder, real_data_encoder, hyper_network, device, target_x,
                                                            remaining_x, real_x, results_dir, epoch, **experiment_dict)
 

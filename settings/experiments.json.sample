@@ -15,6 +15,9 @@
     "classes": [],
     "reconstruction_coef": 0.05,
 
+    "num_workers": 8,
+    "batch_size": 80,
+
     "seed": 2018,
     "remaining_size": 1024,
     "real_size" : 1024,
