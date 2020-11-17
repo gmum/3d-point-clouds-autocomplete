@@ -60,6 +60,7 @@ class ShapeNet(data.Dataset):
             for chunk in response.iter_content(32768):
                 if chunk:
                     f.write(chunk)
+            f.close()
 
     def _maybe_download_data(self):
         if exists(self.root_dir) and False:
@@ -81,7 +82,6 @@ class ShapeNet(data.Dataset):
                 with ZipFile(path, mode='r') as zip_f:
                     zip_f.extractall(self.root_dir)
                 remove(path)
-
 
     def __getitem__(self, index):
         model_id = self.model_list[index // 50]
