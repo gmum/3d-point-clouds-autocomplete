@@ -77,7 +77,7 @@ class ShapeNet(data.Dataset):
         session = requests.Session()
         for filename, file_id in files_dict.items():
             path = join(self.root_dir, filename)
-            self._download_file_from_google_drive(session, filename, file_id)
+            self._download_file_from_google_drive(session, path, file_id)
             if filename.endswith('.zip'):
                 with ZipFile(path, mode='r') as zip_f:
                     zip_f.extractall(self.root_dir)
