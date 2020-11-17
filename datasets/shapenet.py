@@ -99,15 +99,15 @@ class ShapeNetDataset(Dataset):
 
         if self.is_sliced:
             real = load_ply(join(self.root_dir, 'slices', 'real', pc_category, pc_filename))
-            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
+            # remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
             target = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
 
             if self.transform:
                 real = self.transform(real)
-                remaining = self.transform(remaining)
+                # remaining = self.transform(remaining)
                 target = self.transform(target)
 
-            return real, remaining, target, synth_id_to_number[pc_category]
+            return real, target, synth_id_to_number[pc_category]
         else:
             sample = load_ply(join(self.root_dir, pc_category, pc_filename))
             if self.transform:

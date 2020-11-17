@@ -83,6 +83,11 @@ def main(config):
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
                                   classes=config['classes'],
                                   is_sliced=True)
+    elif dataset_name == 'shapenet_msn':
+        from datasets.shapenetMSN import ShapeNet
+        dataset = ShapeNet(root_dir=config['data_dir'], train=True,
+                           real_size=config['real_size'],
+                           npoints=config['n_points'])
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
@@ -171,23 +176,24 @@ def main(config):
         total_loss_kld = 0.0
         for i, point_data in enumerate(points_dataloader, 1):
 
-            real_X, remaining_X, target_X, _ = point_data
+            real_X, target_X, _ = point_data
 
             real_X = real_X.to(device)
-            remaining_X = remaining_X.to(device)
+            # remaining_X = remaining_X.to(device)
             target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
             if real_X.size(-1) == 3:
                 real_X.transpose_(real_X.dim() - 2, real_X.dim() - 1)
 
-            if remaining_X.size(-1) == 3:
-                remaining_X.transpose_(remaining_X.dim() - 2, remaining_X.dim() - 1)
+            # if remaining_X.size(-1) == 3:
+            #    remaining_X.transpose_(remaining_X.dim() - 2, remaining_X.dim() - 1)
 
             if target_X.size(-1) == 3:
                 target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
 
-            codes, mu, logvar = encoder(remaining_X)
+            # codes, mu, logvar = encoder(remaining_X)
+            codes, mu, logvar = encoder(target_X)
             real_mu = real_data_encoder(real_X)
 
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))

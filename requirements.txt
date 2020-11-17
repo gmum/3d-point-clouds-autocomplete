@@ -1,3 +1,5 @@
+requests
+open3d
 h5py==2.10.0
 matplotlib
 numpy
