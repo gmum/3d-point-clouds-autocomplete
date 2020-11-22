@@ -20,7 +20,7 @@ def resample_pcd(pcd, n):
 
 
 class ShapeNet(data.Dataset):
-    def __init__(self, root_dir, train=True, real_size=5000, npoints=8192):
+    def __init__(self, root_dir, train=True, real_size=5000, npoints=8192, classes=[], num_of_samples=50):
 
         self.root_dir = root_dir
 
@@ -31,19 +31,24 @@ class ShapeNet(data.Dataset):
         else:
             self.list_path = join(root_dir, 'val.list')
         self.npoints = npoints
+
+        self.num_of_samples = num_of_samples
+
         self.real_size = real_size
         self.train = train
 
         with open(self.list_path) as file:
-            self.model_list = [line.strip().replace('/', '_') for line in file]
+            if classes:
+                self.model_list = [line.strip().replace('/', '_') for line in file if line.strip().split('/')[0] in classes]
+            else:
+                self.model_list = [line.strip().replace('/', '_') for line in file]
         random.shuffle(self.model_list)
-        self.len = len(self.model_list * 50)
+        self.len = len(self.model_list * self.num_of_samples)
 
     def _get_confirm_token(self, response):
         for key, value in response.cookies.items():
             if key.startswith('download_warning'):
                 return value
-
         return None
 
     def _download_file_from_google_drive(self, session, dest, file_id):
@@ -60,10 +65,9 @@ class ShapeNet(data.Dataset):
             for chunk in response.iter_content(32768):
                 if chunk:
                     f.write(chunk)
-            f.close()
 
     def _maybe_download_data(self):
-        if exists(self.root_dir) and False:
+        if exists(self.root_dir):
             return
         makedirs(self.root_dir, exist_ok=True)
 
@@ -84,19 +88,19 @@ class ShapeNet(data.Dataset):
                 remove(path)
 
     def __getitem__(self, index):
-        model_id = self.model_list[index // 50]
-        scan_id = index % 50
+        model_id = self.model_list[index // self.num_of_samples]
+        scan_id = index % self.num_of_samples
 
         def read_pcd(filename):
             pcd = o3d.io.read_point_cloud(filename)
             return torch.from_numpy(np.array(pcd.points)).float()
 
         if self.train:
-            partial = read_pcd(os.path.join(self.root_dir, 'train', model_id + '_%d_denoised.pcd' % scan_id))
+            partial = read_pcd(os.path.join(self.root_dir, 'train', model_id + '_%d.pcd' % scan_id))
         else:
             partial = read_pcd(os.path.join(self.root_dir, 'val', model_id + '_%d_denoised.pcd' % scan_id))
         complete = read_pcd(os.path.join(self.root_dir, 'complete', '%s.pcd' % model_id))
-        return resample_pcd(partial, 5000), resample_pcd(complete, self.npoints), model_id
+        return resample_pcd(partial, self.real_size), resample_pcd(complete, self.npoints), model_id
 
     def __len__(self):
         return self.len

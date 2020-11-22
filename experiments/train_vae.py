@@ -87,7 +87,9 @@ def main(config):
         from datasets.shapenetMSN import ShapeNet
         dataset = ShapeNet(root_dir=config['data_dir'], train=True,
                            real_size=config['real_size'],
-                           npoints=config['n_points'])
+                           npoints=config['n_points'],
+                           num_of_samples=config['num_of_samples'],
+                           classes=config['classes'])
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')

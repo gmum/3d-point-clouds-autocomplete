@@ -103,4 +103,15 @@ def get_distribution_dir(config):
 
 def show_3d_cloud(points_cloud):
     import pptk
-    pptk.viewer(points_cloud).set(show_axis=False)
+    # pptk.viewer(points_cloud).set(show_axis=False)
+    pptk.viewer(points_cloud).set()
+
+
+def replace_and_rename_pcd_file(source, dest):
+    from shutil import copyfile
+    model_ids = listdir(source)
+    for model_id in model_ids:
+        for sample in listdir(join(source, model_id)):
+            for filename in listdir(join(source, model_id, sample)):
+                copyfile(join(source, model_id, sample, filename), join(dest, f'{model_id}_{sample}_{filename}'))
+
