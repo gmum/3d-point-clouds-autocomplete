@@ -130,7 +130,7 @@ class EncoderForRandomPoints(nn.Module):
         mu = self.mu_layer(logit)
         logvar = self.std_layer(logit)
         z = self.reparameterize(mu, logvar)
-        return z, mu, torch.exp(logvar)
+        return z, mu, logvar
 
 
 class EncoderForRealPoints(nn.Module):

@@ -179,19 +179,15 @@ def main(config):
         total_loss_r = 0.0
         total_loss_kld = 0.0
         for i, point_data in enumerate(points_dataloader, 1):
+            e_hn_optimizer.zero_grad()
 
             real_X, target_X, _ = point_data
-
             real_X = real_X.to(device)
-            # remaining_X = remaining_X.to(device)
             target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
             if real_X.size(-1) == 3:
                 real_X.transpose_(real_X.dim() - 2, real_X.dim() - 1)
-
-            # if remaining_X.size(-1) == 3:
-            #    remaining_X.transpose_(remaining_X.dim() - 2, remaining_X.dim() - 1)
 
             if target_X.size(-1) == 3:
                 target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
@@ -199,7 +195,6 @@ def main(config):
             # codes, mu, logvar = encoder(remaining_X)
             codes, mu, logvar = encoder(target_X)
             real_mu = real_data_encoder(real_X)
-
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
             X_rec = torch.zeros(target_X.shape).to(device)
@@ -219,41 +214,31 @@ def main(config):
                 dist, _ = reconstruction_loss(target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.005, 50)
                 loss_r = torch.mean(config['reconstruction_coef'] * torch.sqrt(dist))
 
-            loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
-
+            # loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
+            loss_kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+            loss_kld = torch.div(loss_kld, real_X.shape[0])
             loss_all = loss_r + loss_kld
-            e_hn_optimizer.zero_grad()
-            real_data_encoder.zero_grad()
-            encoder.zero_grad()
-            hyper_network.zero_grad()
-
-            loss_all.backward()
-            e_hn_optimizer.step()
 
             total_loss_r += loss_r.item()
             total_loss_kld += loss_kld.item()
             total_loss_all += loss_all.item()
 
-        log.info(
-            f'[{epoch}/{config["max_epochs"]}] '
-            f'Loss_ALL: {total_loss_all / i:.4f} '
-            f'Loss_R: {total_loss_r / i:.4f} '
-            f'Loss_E: {total_loss_kld / i:.4f} '
-            f'Time: {datetime.now() - start_epoch_time}'
-        )
-
-        if config['use_telegram_logging']:
-            tg_log.log(
-                f'[{epoch}/{config["max_epochs"]}]\n'
-                f'Loss_ALL: {total_loss_all / i:.4f}\n'
-                f'Loss_R: {total_loss_r / i:.4f}\n'
-                f'Loss_E: {total_loss_kld / i:.4f}\n'
-                f'Time: {datetime.now() - start_epoch_time}'
-            )
+            loss_all.backward()
+            e_hn_optimizer.step()
 
         losses_e.append(total_loss_r)
         losses_kld.append(total_loss_kld)
         losses_eg.append(total_loss_all)
+
+        log_string = f'[{epoch}/{config["max_epochs"]}] '\
+                     f'Loss_ALL: {total_loss_all / i:.4f} '\
+                     f'Loss_R: {total_loss_r / i:.4f} '\
+                     f'Loss_E: {total_loss_kld / i:.4f} '\
+                     f'Time: {datetime.now() - start_epoch_time}'
+
+        log.info(log_string)
+        if config['use_telegram_logging']:
+            tg_log.log(log_string)
 
         #
         # Save intermediate results
