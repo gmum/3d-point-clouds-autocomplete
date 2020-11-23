@@ -114,14 +114,16 @@ def main(config):
     encoder.apply(weights_init)
     real_data_encoder.apply(weights_init)
 
+    loss_id = None
+
     if config['reconstruction_loss'].lower() == 'chamfer':
+        loss_id = 0
         from losses.champfer_loss import ChamferLoss
         reconstruction_loss = ChamferLoss().to(device)
-    elif config['reconstruction_loss'].lower() == 'earth_mover':
-        # from utils.metrics import earth_mover_distance
-        # reconstruction_loss = earth_mover_distance
-        from losses.earth_mover_distance import EMD
-        reconstruction_loss = EMD().to(device)
+    elif config['reconstruction_loss'].lower() == 'emd':
+        loss_id = 1
+        from losses.emd.emd_module import emdModule
+        reconstruction_loss = emdModule().to(device)
     else:
         raise ValueError(f'Invalid reconstruction loss. Accepted `chamfer` or '
                          f'`earth_mover`, got: {config["reconstruction_loss"]}')
@@ -209,10 +211,13 @@ def main(config):
 
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
-            loss_r = torch.mean(
-                config['reconstruction_coef'] *
-                reconstruction_loss(target_X.permute(0, 2, 1) + 0.5,
-                                    X_rec.permute(0, 2, 1) + 0.5))
+            if loss_id == 0:
+                loss_r = torch.mean(
+                    config['reconstruction_coef'] *
+                    reconstruction_loss(target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
+            elif loss_id == 1:
+                dist, _ = reconstruction_loss(target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.005, 50)
+                loss_r = torch.mean(config['reconstruction_coef'] * torch.sqrt(dist))
 
             loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
 
@@ -259,9 +264,9 @@ def main(config):
 
         saved_plots = []
         for k in range(min(5, X_rec.shape[0])):
+            saved_plots.append(save_plot(real_X[k], epoch, k, results_dir, 'cut'))
             saved_plots.append(save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed'))
             saved_plots.append(save_plot(target_X[k], epoch, k, results_dir, 'real'))
-            saved_plots.append(save_plot(real_X[k], epoch, k, results_dir, 'cut'))
 
         if config['use_telegram_logging']:
             tg_log.log_images(saved_plots[:9])

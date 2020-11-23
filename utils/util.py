@@ -35,7 +35,7 @@ def setup_logging(log_dir):
 
 def prepare_results_dir(config, arch, experiment, dirs_to_create=('weights', 'samples', 'metrics')):
     output_dir = join(config['results_root'], arch, experiment, get_distribution_dir(config), config['dataset'],
-                      get_classes_dir(config))
+                      config['reconstruction_loss'].lower(), get_classes_dir(config))
     if config['clean_results_dir']:
         if exists(output_dir):
             print('Attention! Cleaning results directory in 10 seconds!')
