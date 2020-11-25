@@ -6,7 +6,7 @@ class HyperNetwork(nn.Module):
     def __init__(self, config, device):
         super().__init__()
 
-        self.input_size = config['remaining_size'] + config['real_size']
+        self.input_size = config['random_encoder_output_size'] + config['real_encoder_output_size']
         self.use_bias = config['model']['HN']['use_bias']
         self.relu_slope = config['model']['HN']['relu_slope']
         # target network layers out channels
@@ -90,7 +90,7 @@ class EncoderForRandomPoints(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['remaining_size']
+        self.z_size = config['random_encoder_output_size']
         self.use_bias = config['model']['E']['use_bias']
         self.relu_slope = config['model']['E']['relu_slope']
 
@@ -130,7 +130,7 @@ class EncoderForRandomPoints(nn.Module):
         mu = self.mu_layer(logit)
         logvar = self.std_layer(logit)
         z = self.reparameterize(mu, logvar)
-        return z, mu, logvar
+        return z, mu, torch.exp(logvar)
 
 
 class EncoderForRealPoints(nn.Module):
@@ -138,7 +138,7 @@ class EncoderForRealPoints(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['real_size']
+        self.z_size = config['real_encoder_output_size']
         self.use_bias = config['model']['ER']['use_bias']
         self.relu_slope = config['model']['ER']['relu_slope']
 

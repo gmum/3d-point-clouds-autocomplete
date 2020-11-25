@@ -114,9 +114,6 @@ def main(config):
         else:
             from losses.champfer_loss import ChamferLoss
             reconstruction_loss = ChamferLoss().to(device)
-    elif config['reconstruction_loss'].lower() == 'earth_mover':
-        from utils.metrics import earth_mover_distance
-        reconstruction_loss = earth_mover_distance
     else:
         raise ValueError(f'Invalid reconstruction loss. Accepted `chamfer` or '
                          f'`earth_mover`, got: {config["reconstruction_loss"]}')

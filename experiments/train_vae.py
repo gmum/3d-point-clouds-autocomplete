@@ -67,6 +67,7 @@ def main(config):
         tg_log = TelegramLogger(config['tg_bot_token'], config['tg_chat_id'])
 
     device = cuda_setup(config['cuda'], config['gpu'])
+
     log.info(f'Device variable: {device}')
     if device.type == 'cuda':
         log.info(f'Current CUDA device: {torch.cuda.current_device()}')
@@ -195,6 +196,7 @@ def main(config):
             # codes, mu, logvar = encoder(remaining_X)
             codes, mu, logvar = encoder(target_X)
             real_mu = real_data_encoder(real_X)
+
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
             X_rec = torch.zeros(target_X.shape).to(device)
@@ -214,8 +216,8 @@ def main(config):
                 dist, _ = reconstruction_loss(target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.005, 50)
                 loss_r = torch.mean(config['reconstruction_coef'] * torch.sqrt(dist))
 
-            # loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
-            loss_kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+            loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
+            # loss_kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
             loss_kld = torch.div(loss_kld, real_X.shape[0])
             loss_all = loss_r + loss_kld
 
