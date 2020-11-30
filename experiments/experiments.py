@@ -168,7 +168,8 @@ def main(config):
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
             loss_chamfer_our = torch.mean(losses_functions['chamfer our'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
-            loss_emd_msn = torch.mean(losses_functions['msn emd'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
+            dist, _ = losses_functions['msn emd'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.005, 50)
+            loss_emd_msn = torch.mean(torch.sqrt(dist))
             loss_chamfer_dist = losses_functions['chamfer dist'](X_rec.permute(0, 2, 1) + 0.5, target_X.permute(0, 2, 1) + 0.5, reduction='mean')
 
             loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
