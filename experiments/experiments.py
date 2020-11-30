@@ -172,12 +172,12 @@ def main(config):
             loss_emd_msn = torch.mean(torch.sqrt(dist))
             loss_chamfer_dist = losses_functions['chamfer dist'](X_rec.permute(0, 2, 1) + 0.5, target_X.permute(0, 2, 1) + 0.5, reduction='mean')
 
-            loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
+            # loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
 
-            loss_eg = loss_chamfer_our + loss_kld
+            # loss_eg = loss_chamfer_our + loss_kld
 
-            total_loss_kld += loss_kld.item()
-            total_loss_eg += loss_eg.item()
+            # total_loss_kld += loss_kld.item()
+            # total_loss_eg += loss_eg.item()
 
             total_loss_chamfer_our += loss_chamfer_our.item()
             total_loss_emd_msn += loss_emd_msn.item()
