@@ -23,6 +23,12 @@ from utils.points import generate_points
 
 cudnn.benchmark = True
 
+def save_plot(X, epoch, k, results_dir, t):
+    fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}_{k} epoch: {epoch}')
+    fig_path = join(results_dir, 'samples', f'{epoch}_{k}_{t}.png')
+    fig.savefig(fig_path)
+    plt.close(fig)
+    return fig_path
 
 def main(config):
     set_seed(config['seed'])
@@ -168,7 +174,7 @@ def main(config):
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
             loss_chamfer_our = torch.mean(losses_functions['chamfer our'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
-            dist, _ = losses_functions['msn emd'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.005, 50)
+            dist, _ = losses_functions['msn emd'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.002, 10000)
             loss_emd_msn = torch.mean(torch.sqrt(dist))
             loss_chamfer_dist = losses_functions['chamfer dist'](X_rec.permute(0, 2, 1) + 0.5, target_X.permute(0, 2, 1) + 0.5, reduction='mean')
 
@@ -183,19 +189,27 @@ def main(config):
             total_loss_emd_msn += loss_emd_msn.item()
             total_loss_chamfer_dist += loss_chamfer_dist.item()
 
-        log_string = f'Loss_ALL: {total_loss_eg / i:.4f} '\
-                     f'Loss_CO: {total_loss_chamfer_our / i:.4f} ' \
+        log_string = f'Loss_CO: {total_loss_chamfer_our / i:.4f} ' \
                      f'Loss_EMD_MSN: {total_loss_emd_msn / i:.4f} ' \
-                     f'Loss_cd: {total_loss_chamfer_dist / i:.4f}'\
-                     f'Loss_E: {total_loss_kld / i:.4f} '
+                     f'Loss_cd: {total_loss_chamfer_dist / i:.4f} '
+
+        real_X = real_X.cpu().numpy()
+        target_X = target_X.cpu().numpy()
+        X_rec = X_rec.detach().cpu().numpy()
+
+        saved_plots = []
+        for k in range(min(5, X_rec.shape[0])):
+            saved_plots.append(save_plot(real_X[k], epoch, k, results_dir, 'cut'))
+            saved_plots.append(save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed'))
+            saved_plots.append(save_plot(target_X[k], epoch, k, results_dir, 'real'))
 
         if config['use_telegram_logging']:
-            tg_log.log(log_string)
+            tg_log.log_images(saved_plots[:9], log_string)
 
         log.info(log_string)
 
-        real_x = torch.cat(real_x)
-        target_x = torch.cat(target_x)
+        # real_x = torch.cat(real_x)
+        # target_x = torch.cat(target_x)
 
         for experiment_name, experiment_dict in config['experiments'].items():
             if experiment_dict.pop('execute', False):
