@@ -9,10 +9,15 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.nn.parallel
 import torch.utils.data
+from chamferdist import ChamferDistance
 from torch.utils.data import DataLoader
+
+from losses.champfer_loss import ChamferLoss
+from losses.emd.emd_module import emdModule
 from models import aae
 
 from utils.pcutil import plot_3d_point_cloud
+from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed, get_weights_dir
 from utils.points import generate_points
 
@@ -37,6 +42,9 @@ def main(config):
     global log
     log = logging.getLogger('aae')
 
+    if config['use_telegram_logging']:
+        tg_log = TelegramLogger(config['tg_bot_token'], config['tg_chat_id'])
+
     if not exists(join(results_dir, 'experiment_config.json')):
         with open(join(results_dir, 'experiment_config.json'), mode='w') as f:
             json.dump(config, f)
@@ -56,6 +64,13 @@ def main(config):
                                   classes=config['classes'],
                                   is_sliced=True,
                                   split='test')
+    elif dataset_name == 'shapenet_msn':
+        from datasets.shapenetMSN import ShapeNet
+        dataset = ShapeNet(root_dir=config['data_dir'], train=False,
+                           real_size=config['real_size'],
+                           npoints=config['n_points'],
+                           num_of_samples=config['num_of_samples'],
+                           classes=config['classes'])
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
@@ -73,18 +88,26 @@ def main(config):
     encoder = aae.EncoderForRandomPoints(config).to(device)
     real_data_encoder = aae.EncoderForRealPoints(config).to(device)
 
+    losses_functions = {
+        'chamfer our': ChamferLoss().to(device),
+        'msn emd': emdModule().to(device),
+        'chamfer dist': ChamferDistance().to(device),
+    }
+
+    '''
     if config['reconstruction_loss'].lower() == 'chamfer':
-        from losses.champfer_loss import ChamferLoss
-        reconstruction_loss = ChamferLoss().to(device)
-    elif config['reconstruction_loss'].lower() == 'earth_mover':
-        # from utils.metrics import earth_mover_distance
-        # reconstruction_loss = earth_mover_distance
-        from losses.earth_mover_distance import EMD
-        reconstruction_loss = EMD().to(device)
+        loss_id = 0
+        reconstruction_loss = losses_functions['chamfer our']
+    elif config['reconstruction_loss'].lower() == 'emd':
+        loss_id = 1
+        reconstruction_loss = losses_functions['msn emd']
+    elif config['reconstruction_loss'].lower() == 'chamferdist':
+        loss_id = 2
+        reconstruction_loss = losses_functions['chamfer dist']
     else:
         raise ValueError(f'Invalid reconstruction loss. Accepted `chamfer` or '
                          f'`earth_mover`, got: {config["reconstruction_loss"]}')
-
+    '''
     log.info("Weights for epoch: %s" % epoch)
 
     log.info("Loading weights...")
@@ -97,7 +120,9 @@ def main(config):
     real_data_encoder.eval()
 
     total_loss_eg = 0.0
-    total_loss_e = 0.0
+    total_loss_chamfer_our = 0.0
+    total_loss_emd_msn = 0.0
+    total_loss_chamfer_dist = 0.0
     total_loss_kld = 0.0
 
     real_x = []
@@ -109,28 +134,28 @@ def main(config):
     with torch.no_grad():
         for i, point_data in enumerate(points_dataloader, 1):
 
-            real_X, remaining_X, target_X, _ = point_data
+            real_X, target_X, _ = point_data
 
             real_X = real_X.to(device)
-            remaining_X = remaining_X.to(device)
+            # remaining_X = remaining_X.to(device)
             target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
             if real_X.size(-1) == 3:
                 real_X.transpose_(real_X.dim() - 2, real_X.dim() - 1)
 
-            if remaining_X.size(-1) == 3:
-                remaining_X.transpose_(remaining_X.dim() - 2, remaining_X.dim() - 1)
-
             if target_X.size(-1) == 3:
                 target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
 
             if i - 1 < samples_amount:
                 real_x.append(real_X)
-                remaining_x.append(remaining_X)
                 target_x.append(target_X)
 
-            codes, mu, logvar = encoder(remaining_X)
+            # codes, mu, logvar = encoder(target_X)
+            mu, logvar = 0.0, 0.0
+            # TODO rewrite | temp solution
+            codes = torch.zeros(target_X.shape[0], 1024).normal_(mean=0.0, std=0.015).to(device)
+
             real_mu = real_data_encoder(real_X)
 
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
@@ -142,26 +167,33 @@ def main(config):
                 target_network_input = generate_points(config=config, epoch=epoch, size=(target_X.shape[2], target_X.shape[1]))
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
-            loss_e = torch.mean(
-                config['reconstruction_coef'] *
-                reconstruction_loss(target_X.permute(0, 2, 1) + 0.5,
-                                    X_rec.permute(0, 2, 1) + 0.5))
+            loss_chamfer_our = torch.mean(losses_functions['chamfer our'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
+            loss_emd_msn = torch.mean(losses_functions['msn emd'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
+            loss_chamfer_dist = losses_functions['chamfer dist'](X_rec.permute(0, 2, 1) + 0.5, target_X.permute(0, 2, 1) + 0.5, reduction='mean')
 
             loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
 
-            loss_eg = loss_e + loss_kld
-            total_loss_e += loss_e.item()
+            loss_eg = loss_chamfer_our + loss_kld
+
             total_loss_kld += loss_kld.item()
             total_loss_eg += loss_eg.item()
 
-        log.info(
-            f'Loss_ALL: {total_loss_eg / i:.4f} '
-            f'Loss_R: {total_loss_e / i:.4f} '
-            f'Loss_E: {total_loss_kld / i:.4f} '
-        )
+            total_loss_chamfer_our += loss_chamfer_our.item()
+            total_loss_emd_msn += loss_emd_msn.item()
+            total_loss_chamfer_dist += loss_chamfer_dist.item()
+
+        log_string = f'Loss_ALL: {total_loss_eg / i:.4f} '\
+                     f'Loss_CO: {total_loss_chamfer_our / i:.4f} ' \
+                     f'Loss_EMD_MSN: {total_loss_emd_msn / i:.4f} ' \
+                     f'Loss_cd: {total_loss_chamfer_dist / i:.4f}'\
+                     f'Loss_E: {total_loss_kld / i:.4f} '
+
+        if config['use_telegram_logging']:
+            tg_log.log(log_string)
+
+        log.info(log_string)
 
         real_x = torch.cat(real_x)
-        remaining_x = torch.cat(remaining_x)
         target_x = torch.cat(target_x)
 
         for experiment_name, experiment_dict in config['experiments'].items():
@@ -434,7 +466,7 @@ def fixed(rand_encoder, real_encoder, hyper_network, device, target_x, remaining
     real_x = real_x.cpu().numpy()
 
     for i in range(noises_per_item):
-        fixed_noise = torch.zeros(amount, target_x.shape[2] - real_x.shape[2]).normal_(mean=mean, std=std).to(device)
+        fixed_noise = torch.zeros(amount, 1024).normal_(mean=mean, std=std).to(device)
 
         weights_fixed = hyper_network(torch.cat([fixed_noise, mu_ar], 1))
 

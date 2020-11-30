@@ -18,7 +18,6 @@ def resample_pcd(pcd, n):
         idx = np.concatenate([idx, np.random.randint(pcd.shape[0], size=n - pcd.shape[0])])
     return pcd[idx[:n]]
 
-
 class ShapeNet(data.Dataset):
     def __init__(self, root_dir, train=True, real_size=5000, npoints=8192, classes=[], num_of_samples=50):
 
@@ -104,3 +103,10 @@ class ShapeNet(data.Dataset):
 
     def __len__(self):
         return self.len
+
+
+def get_category_val_datasets(classes=[], **kwargs):
+    categories = ['vessel', 'cabinet', 'table', 'airplane', 'car', 'chair', 'sofa', 'lamp']
+    from datasets.shapenet import category_to_synth_id
+    return {cat_name: ShapeNet(train=False, num_of_samples=50, classes=[category_to_synth_id[cat_name]], **kwargs)
+            for cat_name in categories}

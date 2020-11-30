@@ -26,7 +26,7 @@ class TelegramLogger(object):
         except Exception:
             pass
 
-    def log_images(self, image_paths):
+    def log_images(self, image_paths, message: str = ''):
         try:
             send_data = {
                 'chat_id': self._chat_id,
@@ -34,6 +34,7 @@ class TelegramLogger(object):
                     {
                         'type': 'photo',
                         'media': f'attach://image_{i}.png',
+                        'caption': message if i == 0 else '',
                     } for i in range(len(image_paths))
                 ])
             }
