@@ -10,3 +10,10 @@ utils/pytorch_structural_losses/build/
 losses/emd/build/
 losses/emd/dist/
 losses/emd/emd.egg-info/
+/losses/chamfer/dist/
+/losses/chamfer/chamfer.egg-info/
+/losses/chamfer/build/
+/losses/chamfer_dist/dist/
+/losses/chamfer_dist/chamfer.egg-info/
+/losses/chamfer_dist/build/
+

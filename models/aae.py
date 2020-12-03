@@ -47,7 +47,6 @@ class TargetNetwork(nn.Module):
     def __init__(self, config, weights):
         super().__init__()
 
-        self.z_size = config['remaining_size']
         self.use_bias = config['model']['TN']['use_bias']
         # target network layers out channels
         out_ch = config['model']['TN']['layer_out_channels']

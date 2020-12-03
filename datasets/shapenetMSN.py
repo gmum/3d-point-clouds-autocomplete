@@ -96,6 +96,13 @@ class ShapeNet(data.Dataset):
 
         if self.train:
             partial = read_pcd(os.path.join(self.root_dir, 'train', model_id + '_%d.pcd' % scan_id))
+            '''
+            points = partial.numpy()
+            points[:, 2] *= -1
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            o3d.io.write_point_cloud(os.path.join(self.root_dir, 'train', model_id + '_%d.pcd' % scan_id), pcd)
+            '''
         else:
             partial = read_pcd(os.path.join(self.root_dir, 'val', model_id + '_%d_denoised.pcd' % scan_id))
         complete = read_pcd(os.path.join(self.root_dir, 'complete', '%s.pcd' % model_id))
