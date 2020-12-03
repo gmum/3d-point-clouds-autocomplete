@@ -56,7 +56,9 @@ class ShapeNetCompletionDataset(Dataset):
 
         list_path = os.path.join(root_dir, 'val.list')
 
-        model_lists = dict.fromkeys(classes, [])
+        model_lists = dict.fromkeys(classes)
+        for k in model_lists.keys():
+            model_lists[k] = list()
 
         with open(list_path) as file:
             for line in file:

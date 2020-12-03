@@ -36,7 +36,7 @@ def main(config):
     results_dir = prepare_results_dir(config, config['arch'], 'experiments',
                                       dirs_to_create=['interpolations', 'sphere', 'points_interpolation',
                                                       'different_number_points', 'fixed', 'reconstruction',
-                                                      'sphere_triangles', 'sphere_triangles_interpolation'])
+                                                      'sphere_triangles', 'sphere_triangles_interpolation', 'samples'])
     weights_path = get_weights_dir(config)
     epoch = find_latest_epoch(weights_path)
 
