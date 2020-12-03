@@ -287,7 +287,7 @@ def main(config):
             real_data_encoder.eval()
             val_losses = dict.fromkeys(val_dataset_dict.keys())
             with torch.no_grad():
-
+                val_plots = []
                 for cat_name, dl in val_dataloaders_dict.items():
 
                     total_loss_our_cd = 0.0
@@ -330,6 +330,15 @@ def main(config):
                         total_loss_our_cd += loss_our_cd.item()
                         total_loss_torch3d_cd += loss_torch3d_cd.item()
                         total_loss_gr_cd += loss_gr_cd.item()
+
+                    partial = partial.cpu().numpy()
+                    gt = gt.cpu().numpy()
+                    X_rec = X_rec.detach().cpu().numpy()
+
+                    val_plots.append(save_plot(partial[0], epoch, cat_name, results_dir, 'val_partial'))
+                    val_plots.append(save_plot(X_rec[0], epoch, cat_name, results_dir, 'val_rec'))
+                    val_plots.append(save_plot(gt[0], epoch, cat_name, results_dir, 'val_gt'))
+
                     val_losses[cat_name] = np.array([total_loss_our_cd/i, total_loss_torch3d_cd/i, 10000*total_loss_gr_cd/i])
 
                 total = np.zeros(3)
@@ -343,7 +352,11 @@ def main(config):
 
                 log.info(log_string)
                 if config['use_telegram_logging']:
-                    tg_log.log(log_string)
+                    chosen_plot_ids = np.random.choice(np.arange(8), 3, replace=False)  # TODO use num of classes
+                    plots_to_log = []
+                    for id in chosen_plot_ids:
+                        plots_to_log.extend(val_plots[3*id:3*id+3])
+                    tg_log.log_images(plots_to_log, log_string)
 
         if epoch % config['save_frequency'] == 0:
             log.debug('Saving data...')
