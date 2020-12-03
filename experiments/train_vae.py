@@ -281,7 +281,7 @@ def main(config):
             shutil.rmtree(weights_path, ignore_errors=True)
             os.makedirs(weights_path, exist_ok=True)
 
-        if epoch % config['val_frequency']:
+        if epoch % config['val_frequency'] == 0:
             hyper_network.eval()
             encoder.eval()
             real_data_encoder.eval()
@@ -297,6 +297,8 @@ def main(config):
                     for i, point_data in enumerate(dl, 1):
 
                         partial, gt, _ = point_data
+                        partial = partial.to(device)
+                        gt = gt.to(device)
 
                         # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
                         if partial.size(-1) == 3:
@@ -328,10 +330,17 @@ def main(config):
                         total_loss_our_cd += loss_our_cd.item()
                         total_loss_torch3d_cd += loss_torch3d_cd.item()
                         total_loss_gr_cd += loss_gr_cd.item()
-                    val_losses[cat_name] = [total_loss_our_cd/i, total_loss_torch3d_cd/i, total_loss_gr_cd/i]
+                    val_losses[cat_name] = np.array([total_loss_our_cd/i, total_loss_torch3d_cd/i, 10000*total_loss_gr_cd/i])
 
-                log_string = 'val results: ' + json.dumps(val_losses)
-                print(log_string)
+                total = np.zeros(3)
+                for v in val_losses.values():
+                    total = np.add(total, v)
+                val_losses['total'] = total / len(val_losses.keys())
+
+                log_string = 'val results[0.05*our_cd, torch3d, 10^4*gr_loss]:\n'
+                for k, v in val_losses.items():
+                    log_string += k + ': ' + str(v) + '\n'
+
                 log.info(log_string)
                 if config['use_telegram_logging']:
                     tg_log.log(log_string)
