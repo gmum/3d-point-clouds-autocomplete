@@ -307,8 +307,7 @@ def main(config):
                         if gt.size(-1) == 3:
                             gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
-                        fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size'])\
-                            .normal_(mean=0.0, std=0.015).to(device)  # TODO consider about mean and std
+                        fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size'])  # .normal_(mean=0.0, std=0.015).to(device)  # TODO consider about mean and std
                         real_mu = real_data_encoder(partial)
 
                         target_networks_weights = hyper_network(torch.cat([fixed_noise, real_mu], 1))
