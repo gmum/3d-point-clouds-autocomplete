@@ -116,8 +116,8 @@ def main(config):
         'all' if not config['classes'] else ','.join(config['classes']),
         len(dataset)))
 
-    val_dataloaders_dict = {cat_name: DataLoader(cat_ds, batch_size=config['eval_batch_size'],
-                                            num_workers=config['num_workers'], pin_memory=True)
+    val_dataloaders_dict = {cat_name: DataLoader(cat_ds, batch_size=config['eval_batch_size'], shuffle=True,
+                                                 num_workers=config['num_workers'], pin_memory=True)
                             for cat_name, cat_ds in val_dataset_dict.items()}
 
     train_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=config['shuffle'],
@@ -211,7 +211,7 @@ def main(config):
                 gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
             # codes, mu, logvar = encoder(remaining_X)
-            codes, mu, logvar = encoder(gt)
+            codes, mu, logvar = encoder(partial)
             real_mu = real_data_encoder(partial)
 
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
@@ -307,10 +307,12 @@ def main(config):
                         if gt.size(-1) == 3:
                             gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
-                        fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size']).to(device)  # .normal_(mean=0.0, std=0.015).to(device)  # TODO consider about mean and std
+                        _, random_mu, _ = encoder(partial)
+
+                        # fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size'])  # .normal_(mean=0.0, std=0.015)  # TODO consider about mean and std
                         real_mu = real_data_encoder(partial)
 
-                        target_networks_weights = hyper_network(torch.cat([fixed_noise, real_mu], 1))
+                        target_networks_weights = hyper_network(torch.cat([random_mu, real_mu], 1))
                         X_rec = torch.zeros(gt.shape).to(device)
                         for j, target_network_weights in enumerate(target_networks_weights):
                             target_network = aae.TargetNetwork(config, target_network_weights).to(device)
