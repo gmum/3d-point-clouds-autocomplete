@@ -357,7 +357,7 @@ def main(config):
                     log_string += k + ': ' + str(v) + '\n'
 
                 if best_validation_our_cd > total[0]:
-                    best_validation_our_cd = total
+                    best_validation_our_cd = total[0]
                     best_validation_epoch = epoch
                     log_string += 'new best epoch ' + str(best_validation_epoch)
 
