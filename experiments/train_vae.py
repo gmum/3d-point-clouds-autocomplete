@@ -184,6 +184,9 @@ def main(config):
         normalization_type = config['target_network_input']['normalization']['type']
         assert normalization_type == 'progressive', 'Invalid normalization type'
 
+    best_epoch_validation = -1
+    best_validation_our_cd = 1e10
+
     target_network_input = None
     for epoch in range(starting_epoch, config['max_epochs'] + 1):
         start_epoch_time = datetime.now()
@@ -211,7 +214,7 @@ def main(config):
                 gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
             # codes, mu, logvar = encoder(remaining_X)
-            codes, mu, logvar = encoder(partial)
+            codes, mu, logvar = encoder(gt)
             real_mu = real_data_encoder(partial)
 
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
@@ -347,9 +350,16 @@ def main(config):
                     total = np.add(total, v)
                 val_losses['total'] = total / len(val_losses.keys())
 
+
+
                 log_string = 'val results[0.05*our_cd, torch3d, 10^4*gr_loss]:\n'
                 for k, v in val_losses.items():
                     log_string += k + ': ' + str(v) + '\n'
+
+                if best_validation_our_cd > total[0]:
+                    best_validation_our_cd = total
+                    best_validation_epoch = epoch
+                    log_string += 'new best epoch ' + str(best_validation_epoch)
 
                 log.info(log_string)
                 if config['use_telegram_logging']:
