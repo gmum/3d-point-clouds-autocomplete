@@ -53,14 +53,6 @@ def save_plot(X, epoch, k, results_dir, t):
     return fig_path
 
 
-def eval_losses(X_rec, X_gt, losses_dict):
-    chamfer_our = torch.sum(losses_dict['chamfer our'](X_gt, X_rec))
-    dist, _ = losses_dict['msn emd'](X_gt, X_rec, 0.005, 50)  # ToDo think about constants
-    msn_emd = torch.sqrt(dist).sum()
-    chamfer_dist = losses_dict['chamfer dist'](X_rec, X_gt, reduction='sum')
-    return np.array([chamfer_our, msn_emd, chamfer_dist])
-
-
 def main(config):
     set_seed(config['seed'])
 
@@ -125,11 +117,11 @@ def main(config):
 
     hyper_network = aae.HyperNetwork(config, device).to(device)
     encoder = aae.EncoderForRandomPoints(config).to(device)
-    real_data_encoder = aae.EncoderForRealPoints(config).to(device)
+    # real_data_encoder = aae.EncoderForRealPoints(config).to(device)
 
     hyper_network.apply(weights_init)
     encoder.apply(weights_init)
-    real_data_encoder.apply(weights_init)
+    # real_data_encoder.apply(weights_init)
 
     torch3d_cd_loss = ChamferDistance().to(device)
     gr_cd_loss = CD().to(device)
@@ -150,11 +142,11 @@ def main(config):
                          f'`earth_mover`, got: {config["reconstruction_loss"]}')
 
     #
-    # Optimizers
+    # Optimizers #Fixme Change here
     #
     e_hn_optimizer = getattr(optim, config['optimizer']['E_HN']['type'])
     e_hn_optimizer = e_hn_optimizer(chain(encoder.parameters(),
-                                          real_data_encoder.parameters(),
+                                          # real_data_encoder.parameters(),
                                           hyper_network.parameters()),
                                     **config['optimizer']['E_HN']['hyperparams'])
 
@@ -165,8 +157,8 @@ def main(config):
             join(weights_path, f'{starting_epoch - 1:05}_G.pth')))
         encoder.load_state_dict(torch.load(
             join(weights_path, f'{starting_epoch - 1:05}_E.pth')))
-        real_data_encoder.load_state_dict(torch.load(
-            join(weights_path, f'{starting_epoch - 1:05}_ER.pth')))
+        # real_data_encoder.load_state_dict(torch.load(
+        #     join(weights_path, f'{starting_epoch - 1:05}_ER.pth')))
         e_hn_optimizer.load_state_dict(torch.load(
             join(weights_path, f'{starting_epoch - 1:05}_EGo.pth')))
 
@@ -194,7 +186,7 @@ def main(config):
 
         hyper_network.train()
         encoder.train()
-        real_data_encoder.train()
+        # real_data_encoder.train()
 
         total_loss_all = 0.0
         total_loss_r = 0.0
@@ -214,10 +206,12 @@ def main(config):
                 gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
             # codes, mu, logvar = encoder(remaining_X)
-            codes, mu, logvar = encoder(gt)
-            real_mu = real_data_encoder(partial)
+            codes, mu, logvar = encoder(partial)
+            # real_mu = real_data_encoder(partial)
 
-            target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
+            # target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
+
+            target_networks_weights = hyper_network(codes)
 
             X_rec = torch.zeros(gt.shape).to(device)
             for j, target_network_weights in enumerate(target_networks_weights):
@@ -287,7 +281,7 @@ def main(config):
         if epoch % config['val_frequency'] == 0:
             hyper_network.eval()
             encoder.eval()
-            real_data_encoder.eval()
+            # real_data_encoder.eval()
             val_losses = dict.fromkeys(val_dataset_dict.keys())
             with torch.no_grad():
                 val_plots = []
@@ -313,9 +307,12 @@ def main(config):
                         _, random_mu, _ = encoder(partial)
 
                         # fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size'])  # .normal_(mean=0.0, std=0.015)  # TODO consider about mean and std
-                        real_mu = real_data_encoder(partial)
+                        # real_mu = real_data_encoder(partial)
 
-                        target_networks_weights = hyper_network(torch.cat([random_mu, real_mu], 1))
+                        # target_networks_weights = hyper_network(torch.cat([random_mu, real_mu], 1))
+
+                        target_networks_weights = hyper_network(random_mu)
+
                         X_rec = torch.zeros(gt.shape).to(device)
                         for j, target_network_weights in enumerate(target_networks_weights):
                             target_network = aae.TargetNetwork(config, target_network_weights).to(device)
@@ -374,7 +371,7 @@ def main(config):
 
             torch.save(hyper_network.state_dict(), join(weights_path, f'{epoch:05}_G.pth'))
             torch.save(encoder.state_dict(), join(weights_path, f'{epoch:05}_E.pth'))
-            torch.save(real_data_encoder.state_dict(), join(weights_path, f'{epoch:05}_ER.pth'))
+            # torch.save(real_data_encoder.state_dict(), join(weights_path, f'{epoch:05}_ER.pth'))
             torch.save(e_hn_optimizer.state_dict(), join(weights_path, f'{epoch:05}_EGo.pth'))
 
             np.save(join(metrics_path, f'{epoch:05}_E'), np.array(losses_e))
