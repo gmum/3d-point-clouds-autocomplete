@@ -35,7 +35,7 @@ class HyperNetwork(nn.Module):
             for x in range(1, len(target_network_out_ch))
         ]
 
-        if not config['freeze_layers_learning']:
+        if not config['target_network_freeze_layers_learning']:
             self.output = nn.ModuleList(self.output)
 
     def forward(self, x):

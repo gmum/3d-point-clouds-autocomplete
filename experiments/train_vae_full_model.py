@@ -16,6 +16,7 @@ import torch.utils.data
 from torch.utils.data import DataLoader
 
 from models import aae
+from models.full_model import FullModel
 from utils.pcutil import plot_3d_point_cloud
 from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed
@@ -115,13 +116,9 @@ def main(config):
     train_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=config['shuffle'],
                                   num_workers=config['num_workers'], drop_last=True, pin_memory=True)
 
-    hyper_network = aae.HyperNetwork(config, device).to(device)
-    encoder = aae.EncoderForRandomPoints(config).to(device)
-    # real_data_encoder = aae.EncoderForRealPoints(config).to(device)
+    full_model = FullModel(config['full_model']).to(device)
+    full_model.apply(weights_init)
 
-    hyper_network.apply(weights_init)
-    encoder.apply(weights_init)
-    # real_data_encoder.apply(weights_init)
 
     torch3d_cd_loss = ChamferDistance().to(device)
     gr_cd_loss = CD().to(device)
@@ -145,20 +142,16 @@ def main(config):
     # Optimizers #Fixme Change here
     #
     e_hn_optimizer = getattr(optim, config['optimizer']['E_HN']['type'])
-    e_hn_optimizer = e_hn_optimizer(chain(encoder.parameters(),
-                                          # real_data_encoder.parameters(),
-                                          hyper_network.parameters()),
+    e_hn_optimizer = e_hn_optimizer(full_model.parameters(),
                                     **config['optimizer']['E_HN']['hyperparams'])
 
     log.info("Starting epoch: %s" % starting_epoch)
     if starting_epoch > 1:
         log.info("Loading weights...")
-        hyper_network.load_state_dict(torch.load(
-            join(weights_path, f'{starting_epoch - 1:05}_G.pth')))
-        encoder.load_state_dict(torch.load(
-            join(weights_path, f'{starting_epoch - 1:05}_E.pth')))
-        # real_data_encoder.load_state_dict(torch.load(
-        #     join(weights_path, f'{starting_epoch - 1:05}_ER.pth')))
+
+        full_model.load_state_dict(torch.load(
+            join(weights_path, f'{starting_epoch - 1:05}_full.pth')))
+
         e_hn_optimizer.load_state_dict(torch.load(
             join(weights_path, f'{starting_epoch - 1:05}_EGo.pth')))
 
@@ -184,9 +177,7 @@ def main(config):
         start_epoch_time = datetime.now()
         log.debug("Epoch: %s" % epoch)
 
-        hyper_network.train()
-        encoder.train()
-        # real_data_encoder.train()
+        full_model.train()
 
         total_loss_all = 0.0
         total_loss_r = 0.0
@@ -198,51 +189,20 @@ def main(config):
             partial = partial.to(device)
             gt = gt.to(device)
 
-            # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
-            if partial.size(-1) == 3:
-                partial.transpose_(partial.dim() - 2, partial.dim() - 1)
-
-            if gt.size(-1) == 3:
-                gt.transpose_(gt.dim() - 2, gt.dim() - 1)
-
-            # codes, mu, logvar = encoder(remaining_X)
-            codes, mu, logvar = encoder(partial)
-            # real_mu = real_data_encoder(partial)
-
-            # target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
-
-            target_networks_weights = hyper_network(codes)
-
-            X_rec = torch.zeros(gt.shape).to(device)
-            for j, target_network_weights in enumerate(target_networks_weights):
-                target_network = aae.TargetNetwork(config, target_network_weights).to(device)
-
-                if not config['target_network_input']['constant'] or target_network_input is None:
-                    target_network_input = generate_points(config=config, epoch=epoch, size=(gt.shape[2], gt.shape[1]))
-
-                X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
+            reconstruction, logvar, mu = full_model(partial, gt, epoch, device)
 
             loss_r = torch.mean(
                 config['reconstruction_coef'] *
-                reconstruction_loss(gt.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
-            # TODO refactor
-            '''
-            if loss_id == 0:
-                
-            elif loss_id == 1:
-                dist, _ = reconstruction_loss(gt.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.005, 50)
-                loss_r = torch.mean(config['reconstruction_coef'] * torch.sqrt(dist))
-            elif loss_id == 2:
-                loss_r = reconstruction_loss(X_rec.permute(0, 2, 1) + 0.5, gt.permute(0, 2, 1) + 0.5, reduction='mean')
-            '''
+                reconstruction_loss(gt.permute(0, 2, 1) + 0.5, reconstruction.permute(0, 2, 1) + 0.5))
 
-            # loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
+
+            loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
             # loss_kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-            # loss_kld = torch.div(loss_kld, partial.shape[0])
-            loss_all = loss_r # + loss_kld
+            loss_kld = torch.div(loss_kld, partial.shape[0])
+            loss_all = loss_r + loss_kld
 
             total_loss_r += loss_r.item()
-            # total_loss_kld += loss_kld.item()
+            total_loss_kld += loss_kld.item()
             total_loss_all += loss_all.item()
 
             loss_all.backward()
@@ -262,12 +222,12 @@ def main(config):
 
         partial = partial.cpu().numpy()
         gt = gt.cpu().numpy()
-        X_rec = X_rec.detach().cpu().numpy()
+        reconstruction = reconstruction.detach().cpu().numpy()
 
         saved_plots = []
-        for k in range(min(5, X_rec.shape[0])):
+        for k in range(min(5, reconstruction.shape[0])):
             saved_plots.append(save_plot(partial[k], epoch, k, results_dir, 'cut'))
-            saved_plots.append(save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed'))
+            saved_plots.append(save_plot(reconstruction[k], epoch, k, results_dir, 'reconstructed'))
             saved_plots.append(save_plot(gt[k], epoch, k, results_dir, 'real'))
 
         if config['use_telegram_logging']:
@@ -279,9 +239,7 @@ def main(config):
             os.makedirs(weights_path, exist_ok=True)
 
         if epoch % config['val_frequency'] == 0:
-            hyper_network.eval()
-            encoder.eval()
-            # real_data_encoder.eval()
+            full_model.eval()
             val_losses = dict.fromkeys(val_dataset_dict.keys())
             with torch.no_grad():
                 val_plots = []
@@ -297,36 +255,15 @@ def main(config):
                         partial = partial.to(device)
                         gt = gt.to(device)
 
-                        # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
-                        if partial.size(-1) == 3:
-                            partial.transpose_(partial.dim() - 2, partial.dim() - 1)
-
-                        if gt.size(-1) == 3:
-                            gt.transpose_(gt.dim() - 2, gt.dim() - 1)
-
-                        _, random_mu, _ = encoder(partial)
-
-                        # fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size'])  # .normal_(mean=0.0, std=0.015)  # TODO consider about mean and std
-                        # real_mu = real_data_encoder(partial)
-
-                        # target_networks_weights = hyper_network(torch.cat([random_mu, real_mu], 1))
-
-                        target_networks_weights = hyper_network(random_mu)
-
-                        X_rec = torch.zeros(gt.shape).to(device)
-                        for j, target_network_weights in enumerate(target_networks_weights):
-                            target_network = aae.TargetNetwork(config, target_network_weights).to(device)
-                            target_network_input = generate_points(config=config, epoch=epoch, size=(gt.shape[2],
-                                                                                                     gt.shape[1]))
-                            X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
+                        reconstruction = full_model(partial, gt, epoch, device)
 
                         loss_our_cd = torch.mean(
                             config['reconstruction_coef'] *
-                            reconstruction_loss(gt.permute(0, 2, 1), X_rec.permute(0, 2, 1)))
+                            reconstruction_loss(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1)))
 
-                        loss_torch3d_cd = torch3d_cd_loss(gt.permute(0, 2, 1), X_rec.permute(0, 2, 1),
+                        loss_torch3d_cd = torch3d_cd_loss(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1),
                                                           bidirectional=True)
-                        loss_gr_cd = gr_cd_loss(gt.permute(0, 2, 1), X_rec.permute(0, 2, 1))
+                        loss_gr_cd = gr_cd_loss(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1))
 
                         total_loss_our_cd += loss_our_cd.item()
                         total_loss_torch3d_cd += loss_torch3d_cd.item()
@@ -334,10 +271,10 @@ def main(config):
 
                     partial = partial.cpu().numpy()
                     gt = gt.cpu().numpy()
-                    X_rec = X_rec.detach().cpu().numpy()
+                    reconstruction = reconstruction.detach().cpu().numpy()
 
                     val_plots.append(save_plot(partial[0], epoch, cat_name, results_dir, 'val_partial'))
-                    val_plots.append(save_plot(X_rec[0], epoch, cat_name, results_dir, 'val_rec'))
+                    val_plots.append(save_plot(reconstruction[0], epoch, cat_name, results_dir, 'val_rec'))
                     val_plots.append(save_plot(gt[0], epoch, cat_name, results_dir, 'val_gt'))
 
                     val_losses[cat_name] = np.array([total_loss_our_cd/i, total_loss_torch3d_cd/i, 10000*total_loss_gr_cd/i])
@@ -346,8 +283,6 @@ def main(config):
                 for v in val_losses.values():
                     total = np.add(total, v)
                 val_losses['total'] = total / len(val_losses.keys())
-
-
 
                 log_string = 'val results[0.05*our_cd, torch3d, 10^4*gr_loss]:\n'
                 for k, v in val_losses.items():
@@ -369,9 +304,7 @@ def main(config):
         if epoch % config['save_frequency'] == 0:
             log.debug('Saving data...')
 
-            torch.save(hyper_network.state_dict(), join(weights_path, f'{epoch:05}_G.pth'))
-            torch.save(encoder.state_dict(), join(weights_path, f'{epoch:05}_E.pth'))
-            # torch.save(real_data_encoder.state_dict(), join(weights_path, f'{epoch:05}_ER.pth'))
+            torch.save(full_model.state_dict(), join(weights_path, f'{epoch:05}_full.pth'))
             torch.save(e_hn_optimizer.state_dict(), join(weights_path, f'{epoch:05}_EGo.pth'))
 
             np.save(join(metrics_path, f'{epoch:05}_E'), np.array(losses_e))

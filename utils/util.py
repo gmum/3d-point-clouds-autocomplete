@@ -35,7 +35,7 @@ def setup_logging(log_dir):
 
 def prepare_results_dir(config, arch, experiment, dirs_to_create=('weights', 'samples', 'metrics')):
     output_dir = join(config['results_root'], arch, experiment, get_distribution_dir(config), config['dataset'],
-                      get_classes_dir(config))
+                      get_classes_dir(config), config['model_name'])
     if config['clean_results_dir']:
         if exists(output_dir):
             print('Attention! Cleaning results directory in 10 seconds!')
@@ -49,7 +49,7 @@ def prepare_results_dir(config, arch, experiment, dirs_to_create=('weights', 'sa
 
 def find_latest_epoch(dirpath):
     # Files with weights are in format ddddd_{D,E,G}.pth
-    epoch_regex = re.compile(r'^(?P<n_epoch>\d+)_[DEG]\.pth$')
+    epoch_regex = re.compile(r'^(?P<n_epoch>\d+)_([DEG]|full)\.pth$')
     epochs_completed = []
     if exists(join(dirpath, 'weights')):
         dirpath = join(dirpath, 'weights')
