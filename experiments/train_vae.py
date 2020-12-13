@@ -5,6 +5,8 @@ from datetime import datetime
 import shutil
 from itertools import chain
 from os.path import join, exists
+
+import h5py
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -14,6 +16,7 @@ import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from models import aae
 from utils.pcutil import plot_3d_point_cloud
@@ -100,6 +103,7 @@ def main(config):
         from datasets.completion import ShapeNetCompletionDataset
         dataset = ShapeNetCompletionDataset(root_dir=config['data_dir'], split='train', classes=config['classes'])
         val_dataset_dict = ShapeNetCompletionDataset.get_validation_datasets(config['data_dir'], classes=config['classes'])
+        test_dataset = ShapeNetCompletionDataset(root_dir=config['data_dir'], split='test')
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
@@ -114,6 +118,9 @@ def main(config):
 
     train_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=config['shuffle'],
                                   num_workers=config['num_workers'], drop_last=True, pin_memory=True)
+
+    test_dataloader = DataLoader(test_dataset, batch_size=config['test']['batch_size'], shuffle=config['shuffle'],
+                                 num_workers=config['num_workers'])
 
     hyper_network = aae.HyperNetwork(config, device).to(device)
     # encoder = aae.EncoderForRandomPoints(config).to(device)
@@ -149,6 +156,52 @@ def main(config):
                                           real_data_encoder.parameters(),
                                           hyper_network.parameters()),
                                     **config['optimizer']['E_HN']['hyperparams'])
+
+    if config['test']['execute']:
+        test_epoch = config['test']['epoch']
+        hyper_network.load_state_dict(torch.load(
+            join(weights_path, f'{test_epoch:05}_G.pth')))
+        # encoder.load_state_dict(torch.load(
+        #     join(weights_path, f'{starting_epoch - 1:05}_E.pth')))
+        real_data_encoder.load_state_dict(torch.load(
+            join(weights_path, f'{test_epoch:05}_ER.pth')))
+        e_hn_optimizer.load_state_dict(torch.load(
+            join(weights_path, f'{test_epoch:05}_EGo.pth')))
+
+        hyper_network.eval()
+        # encoder.eval()
+        real_data_encoder.eval()
+
+        benchmark_submission_dir = join(config['results_root'], 'benchmark', 'shapenet', 'test', 'partial', 'all')
+        os.makedirs(benchmark_submission_dir, exist_ok=True)
+
+        for i, point_data in tqdm(enumerate(test_dataloader, 1), total=len(test_dataloader)):
+            partial, _, model_id = point_data
+            partial = partial.to(device)
+
+            if partial.size(-1) == 3:
+                partial.transpose_(partial.dim() - 2, partial.dim() - 1)
+
+            real_mu = real_data_encoder(partial)
+
+            target_networks_weights = hyper_network(real_mu)
+
+            X_rec = torch.zeros(partial.shape).to(device)
+            for j, target_network_weights in enumerate(target_networks_weights):
+                target_network = aae.TargetNetwork(config, target_network_weights).to(device)
+                target_network_input = generate_points(config=config, epoch=test_epoch, size=(partial.shape[2],
+                                                                                         partial.shape[1]))
+                X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
+
+            X_rec = X_rec.detach().cpu()
+            for idx, x in enumerate(X_rec.permute(0, 2, 1)):
+
+                ofile = join(benchmark_submission_dir, model_id[idx].split('/')[-1] + '.h5')
+                with h5py.File(ofile, "w") as f:
+                    f.create_dataset("data", data=x.numpy())
+
+        if config['test']['only']:
+            exit(0)
 
     log.info("Starting epoch: %s" % starting_epoch)
     if starting_epoch > 1:
@@ -192,9 +245,7 @@ def main(config):
         total_loss_r = 0.0
         total_loss_kld = 0.0
 
-        from tqdm import tqdm
-
-        for i, point_data in tqdm(enumerate(train_dataloader, 1),total=len(train_dataloader)):
+        for i, point_data in tqdm(enumerate(train_dataloader, 1), total=len(train_dataloader)):
             e_hn_optimizer.zero_grad()
 
             partial, gt, _ = point_data
