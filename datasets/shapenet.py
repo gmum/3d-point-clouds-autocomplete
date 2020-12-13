@@ -9,7 +9,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 from utils.plyfile import load_ply
-from datasets.dataset_generator import SlicedDatasetGenerator
+from datasets.utils.dataset_generator import SlicedDatasetGenerator
 
 synth_id_to_category = {
     '02691156': 'airplane', '02773838': 'bag', '02801938': 'basket',

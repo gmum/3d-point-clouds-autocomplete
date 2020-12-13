@@ -6,9 +6,10 @@ import open3d as o3d
 import requests
 import torch
 import numpy as np
-import torch.utils.data as data
 import os
 import random
+
+from datasets.base_dataset import BaseDataset
 
 
 def resample_pcd(pcd, n):
@@ -18,23 +19,23 @@ def resample_pcd(pcd, n):
         idx = np.concatenate([idx, np.random.randint(pcd.shape[0], size=n - pcd.shape[0])])
     return pcd[idx[:n]]
 
-class ShapeNet(data.Dataset):
-    def __init__(self, root_dir, train=True, real_size=5000, npoints=8192, classes=[], num_of_samples=50):
 
-        self.root_dir = root_dir
+class ShapeNet(BaseDataset):
+
+    def __init__(self, root_dir, split, classes=[], real_size=5000, npoints=8192,  num_of_samples=50):
+        super().__init__(root_dir, split, classes)
 
         self._maybe_download_data()
 
-        if train:
+        if self.split == 'train':
             self.list_path = join(root_dir, 'train.list')
         else:
             self.list_path = join(root_dir, 'val.list')
-        self.npoints = npoints
 
+        self.npoints = npoints
         self.num_of_samples = num_of_samples
 
         self.real_size = real_size
-        self.train = train
 
         with open(self.list_path) as file:
             if classes:
@@ -94,7 +95,7 @@ class ShapeNet(data.Dataset):
             pcd = o3d.io.read_point_cloud(filename)
             return torch.from_numpy(np.array(pcd.points)).float()
 
-        if self.train:
+        if self.split == 'train':
             partial = read_pcd(os.path.join(self.root_dir, 'train', model_id + '_%d.pcd' % scan_id))
             '''
             points = partial.numpy()
@@ -111,9 +112,10 @@ class ShapeNet(data.Dataset):
     def __len__(self):
         return self.len
 
-
-def get_category_val_datasets(classes=[], **kwargs):
-    categories = ['vessel', 'cabinet', 'table', 'airplane', 'car', 'chair', 'sofa', 'lamp']
-    from datasets.shapenet import category_to_synth_id
-    return {cat_name: ShapeNet(train=False, num_of_samples=50, classes=[category_to_synth_id[cat_name]], **kwargs)
-            for cat_name in categories}
+    @classmethod
+    def get_validation_datasets(cls, root_dir, classes=[]):
+        if not classes:
+            classes = ['02691156', '02933112', '02958343', '03001627', '03636649', '04256520', '04379243', '04530566']
+        from datasets.shapenet import synth_id_to_category
+        return {synth_id_to_category[class_id]: ShapeNet(root_dir, 'val', classes=[class_id], num_of_samples=50)
+                for class_id in classes}

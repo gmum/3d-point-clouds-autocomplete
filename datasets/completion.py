@@ -2,21 +2,19 @@ import os
 
 import h5py
 import numpy as np
-from torch.utils.data import Dataset
 
+from datasets.base_dataset import BaseDataset
 from datasets.shapenet import synth_id_to_category
 
 
-class ShapeNetCompletionDataset(Dataset):
+class ShapeNetCompletionDataset(BaseDataset):
 
     def __init__(self, root_dir='/home/datasets/completion', split='train', classes=[], model_list=None):
-        self.root_dir = root_dir
+        super(ShapeNetCompletionDataset, self).__init__(root_dir, split, classes)
 
-        self.split = split
-
-        if split == 'train':
+        if self.split == 'train':
             self.list_path = os.path.join(root_dir, 'train.list')
-        elif split == 'val':
+        elif self.split == 'val':
             self.list_path = os.path.join(root_dir, 'val.list')
         else:
             self.list_path = os.path.join(root_dir, 'test.list')
@@ -49,8 +47,8 @@ class ShapeNetCompletionDataset(Dataset):
             gt = partial
         return partial, gt, model_name
 
-    @staticmethod
-    def get_validation_datasets(root_dir, classes=[]):
+    @classmethod
+    def get_validation_datasets(cls, root_dir, classes=[]):
         if not classes:
             classes = ['02691156', '02933112', '02958343', '03001627', '03636649', '04256520', '04379243', '04530566']
 

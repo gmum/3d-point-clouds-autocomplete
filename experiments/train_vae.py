@@ -4,7 +4,8 @@ import logging
 from datetime import datetime
 import shutil
 from itertools import chain
-from os.path import join, exists
+from os.path import join, exists, basename
+from zipfile import ZipFile
 
 import h5py
 import numpy as np
@@ -175,6 +176,8 @@ def main(config):
         benchmark_submission_dir = join(config['results_root'], 'benchmark', 'shapenet', 'test', 'partial', 'all')
         os.makedirs(benchmark_submission_dir, exist_ok=True)
 
+        submission_zip = ZipFile('submission.zip', 'w')
+
         for i, point_data in tqdm(enumerate(test_dataloader, 1), total=len(test_dataloader)):
             partial, _, model_id = point_data
             partial = partial.to(device)
@@ -199,6 +202,8 @@ def main(config):
                 ofile = join(benchmark_submission_dir, model_id[idx].split('/')[-1] + '.h5')
                 with h5py.File(ofile, "w") as f:
                     f.create_dataset("data", data=x.numpy())
+                    f.close()
+                submission_zip.write(ofile, 'all/'+basename(ofile))
 
         if config['test']['only']:
             exit(0)
