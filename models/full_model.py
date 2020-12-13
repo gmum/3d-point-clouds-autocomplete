@@ -19,14 +19,11 @@ class FullModel(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-
         self._complete_config(config)
 
         self.random_encoder = Encoder(config['random_encoder'], is_vae=True)
         self.real_encoder = Encoder(config['real_encoder'], is_vae=False)
-
         self.hyper_network = HyperNetwork(config['hyper_network'])
-
         self.target_network_config = config['target_network']
 
         self.point_generator_config = {'target_network_input': config['target_network_input']}

@@ -401,8 +401,6 @@ def main(config):
                     total = np.add(total, v)
                 val_losses['total'] = total / len(val_losses.keys())
 
-
-
                 log_string = 'val results[0.05*our_cd, torch3d, 10^4*gr_loss]:\n'
                 for k, v in val_losses.items():
                     log_string += k + ': ' + str(v) + '\n'
@@ -420,7 +418,7 @@ def main(config):
                         plots_to_log.extend(val_plots[3*id:3*id+3])
                     tg_log.log_images(plots_to_log, log_string)
 
-        if epoch % config['save_frequency'] == 0:
+        if (epoch % config['save_frequency'] == 0) or (epoch == best_validation_epoch):
             log.debug('Saving data...')
 
             torch.save(hyper_network.state_dict(), join(weights_path, f'{epoch:05}_G.pth'))
