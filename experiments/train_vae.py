@@ -158,6 +158,8 @@ def main(config):
                                           hyper_network.parameters()),
                                     **config['optimizer']['E_HN']['hyperparams'])
 
+    scheduler = optim.lr_scheduler.StepLR(e_hn_optimizer, step_size=30, gamma=0.05)
+
     if config['test']['execute']:
         test_epoch = config['test']['epoch']
         hyper_network.load_state_dict(torch.load(
@@ -306,6 +308,8 @@ def main(config):
 
             loss_all.backward()
             e_hn_optimizer.step()
+
+        scheduler.step()
 
         losses_e.append(total_loss_r)
         losses_kld.append(total_loss_kld)
