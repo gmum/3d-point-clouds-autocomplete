@@ -158,7 +158,7 @@ def main(config):
                                           hyper_network.parameters()),
                                     **config['optimizer']['E_HN']['hyperparams'])
 
-    scheduler = optim.lr_scheduler.StepLR(e_hn_optimizer, step_size=30, gamma=0.05)
+
 
     if config['test']['execute']:
         test_epoch = config['test']['epoch']
@@ -238,6 +238,8 @@ def main(config):
 
     best_epoch_validation = -1
     best_validation_our_cd = 1e10
+
+    scheduler = optim.lr_scheduler.StepLR(e_hn_optimizer, last_epoch=starting_epoch-1, **config['scheduler'])
 
     target_network_input = None
     for epoch in range(starting_epoch, config['max_epochs'] + 1):
