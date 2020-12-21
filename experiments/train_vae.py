@@ -239,7 +239,7 @@ def main(config):
     best_epoch_validation = -1
     best_validation_our_cd = 1e10
 
-    scheduler = optim.lr_scheduler.StepLR(e_hn_optimizer, last_epoch=starting_epoch-1, **config['scheduler'])
+    scheduler = optim.lr_scheduler.StepLR(e_hn_optimizer, **config['scheduler'])
 
     target_network_input = None
     for epoch in range(starting_epoch, config['max_epochs'] + 1):
