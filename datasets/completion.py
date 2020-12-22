@@ -48,7 +48,7 @@ class ShapeNetCompletionDataset(BaseDataset):
         return partial, gt, model_name
 
     @classmethod
-    def get_validation_datasets(cls, root_dir, classes=[]):
+    def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
         if not classes:
             classes = ['02691156', '02933112', '02958343', '03001627', '03636649', '04256520', '04379243', '04530566']
 

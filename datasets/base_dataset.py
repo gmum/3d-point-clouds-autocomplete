@@ -8,5 +8,5 @@ class BaseDataset(Dataset):
         self.split = split
 
     @classmethod
-    def get_validation_datasets(cls, root_dir, classes=[]):
+    def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
         raise NotImplementedError

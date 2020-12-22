@@ -12,7 +12,6 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
@@ -26,10 +25,7 @@ from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup
 from utils.points import generate_points
 from chamferdist import ChamferDistance
 from losses.champfer_loss import ChamferLoss
-from losses.emd.emd_module import emdModule
 from losses.chamfer_dist import ChamferDistance as CD
-
-cudnn.benchmark = True
 
 
 def weights_init(m):
@@ -92,7 +88,7 @@ def main(config):
         from datasets.shapenet import ShapeNetDataset
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
                                   classes=config['classes'],
-                                  is_sliced=True)
+                                  is_sliced=True, is_random_rotated=True)
     elif dataset_name == 'shapenet_msn':
         from datasets.shapenetMSN import ShapeNet
         dataset = ShapeNet(root_dir=config['data_dir'], train=True,

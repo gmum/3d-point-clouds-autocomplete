@@ -3,30 +3,23 @@ import json
 import logging
 from datetime import datetime
 import shutil
-from itertools import chain
 from os.path import join, exists
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn.parallel
 import torch.optim as optim
 import torch.utils.data
 from torch.utils.data import DataLoader
 
-from models import aae
-from models.full_model import FullModel
+from model.full_model import FullModel
 from utils.pcutil import plot_3d_point_cloud
 from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed
-from utils.points import generate_points
 from chamferdist import ChamferDistance
 from losses.champfer_loss import ChamferLoss
-from losses.emd.emd_module import emdModule
 from losses.chamfer_dist import ChamferDistance as CD
-
-cudnn.benchmark = True
 
 
 def weights_init(m):
@@ -64,6 +57,9 @@ def main(config):
         with open(join(results_dir, 'config.json'), mode='w') as f:
             json.dump(config, f)
 
+    weights_path = join(results_dir, 'weights')
+    metrics_path = join(results_dir, 'metrics')
+
     setup_logging(results_dir)
     log = logging.getLogger('vae')
 
@@ -78,18 +74,16 @@ def main(config):
     if device.type == 'cuda':
         log.info(f'Current CUDA device: {torch.cuda.current_device()}')
 
-    weights_path = join(results_dir, 'weights')
-    metrics_path = join(results_dir, 'metrics')
 
-    #
-    # Dataset
-    #
     dataset_name = config['dataset'].lower()
-    if dataset_name == 'shapenet':
+    if dataset_name == 'shapenet' or True:
         from datasets.shapenet import ShapeNetDataset
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
                                   classes=config['classes'],
-                                  is_sliced=True)
+                                  is_sliced=True, is_random_rotated=True)
+        val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['data_dir'],
+                                                                   classes=config['classes'],
+                                                                   is_sliced=True, is_random_rotated=True)
     elif dataset_name == 'shapenet_msn':
         from datasets.shapenetMSN import ShapeNet
         dataset = ShapeNet(root_dir=config['data_dir'], train=True,
@@ -119,41 +113,30 @@ def main(config):
     full_model = FullModel(config['full_model']).to(device)
     full_model.apply(weights_init)
 
+    reconstruction_loss = ChamferLoss().to(device)
 
     torch3d_cd_loss = ChamferDistance().to(device)
     gr_cd_loss = CD().to(device)
 
-    # TODO refactor
-    if config['reconstruction_loss'].lower() == 'chamfer':
-        loss_id = 0
-        reconstruction_loss = ChamferLoss().to(device)
-    # elif config['reconstruction_loss'].lower() == 'emd':
-    #     loss_id = 1
-    #     reconstruction_loss = losses_functions['msn emd']
-    elif config['reconstruction_loss'].lower() == 'chamferdist':
-        pass
-        # loss_id = 2
-        # reconstruction_loss = losses_functions['chamfer dist']
-    else:
-        raise ValueError(f'Invalid reconstruction loss. Accepted `chamfer` or '
-                         f'`earth_mover`, got: {config["reconstruction_loss"]}')
 
-    #
-    # Optimizers #Fixme Change here
-    #
     e_hn_optimizer = getattr(optim, config['optimizer']['E_HN']['type'])
     e_hn_optimizer = e_hn_optimizer(full_model.parameters(),
                                     **config['optimizer']['E_HN']['hyperparams'])
+
+    scheduler = optim.lr_scheduler.StepLR(e_hn_optimizer, **config['scheduler'])
 
     log.info("Starting epoch: %s" % starting_epoch)
     if starting_epoch > 1:
         log.info("Loading weights...")
 
         full_model.load_state_dict(torch.load(
-            join(weights_path, f'{starting_epoch - 1:05}_full.pth')))
+            join(weights_path, f'{starting_epoch - 1:05}_model.pth')))
 
         e_hn_optimizer.load_state_dict(torch.load(
-            join(weights_path, f'{starting_epoch - 1:05}_EGo.pth')))
+            join(weights_path, f'{starting_epoch - 1:05}_O.pth')))
+
+        scheduler.load_state_dict(torch.load(
+            join(weights_path, f'{starting_epoch - 1:05}_S.pth')))
 
         log.info("Loading losses...")
         losses_e = np.load(join(metrics_path, f'{starting_epoch - 1:05}_E.npy')).tolist()
@@ -304,8 +287,9 @@ def main(config):
         if epoch % config['save_frequency'] == 0:
             log.debug('Saving data...')
 
-            torch.save(full_model.state_dict(), join(weights_path, f'{epoch:05}_full.pth'))
-            torch.save(e_hn_optimizer.state_dict(), join(weights_path, f'{epoch:05}_EGo.pth'))
+            torch.save(full_model.state_dict(), join(weights_path, f'{epoch:05}_model.pth'))
+            torch.save(e_hn_optimizer.state_dict(), join(weights_path, f'{epoch:05}_O.pth'))
+            torch.save(scheduler.state_dict(), join(weights_path, f'{epoch:05}_S.pth'))
 
             np.save(join(metrics_path, f'{epoch:05}_E'), np.array(losses_e))
             np.save(join(metrics_path, f'{epoch:05}_KLD'), np.array(losses_kld))

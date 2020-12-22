@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from models.encoder import Encoder
-from models.hyper_network import HyperNetwork
-from models.target_network import TargetNetwork
+from model.encoder import Encoder
+from model.hyper_network import HyperNetwork
+from model.target_network import TargetNetwork
 from utils.points import generate_points
 
 

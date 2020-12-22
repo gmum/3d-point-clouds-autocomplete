@@ -5,9 +5,10 @@ from os import listdir, makedirs, remove
 from os.path import exists, join
 from zipfile import ZipFile
 
+import numpy as np
 import pandas as pd
-from torch.utils.data import Dataset
 
+from datasets.base_dataset import BaseDataset
 from utils.plyfile import load_ply
 from datasets.utils.dataset_generator import SlicedDatasetGenerator
 
@@ -37,20 +38,22 @@ category_to_synth_id = {v: k for k, v in synth_id_to_category.items()}
 synth_id_to_number = {k: i for i, k in enumerate(synth_id_to_category.keys())}
 
 
-class ShapeNetDataset(Dataset):
-    def __init__(self, root_dir='/home/datasets/shapenet', classes=[],
-                 transform=None, split='train', is_sliced=False):
+class ShapeNetDataset(BaseDataset):
+
+    def __init__(self, root_dir='/home/datasets/shapenet', classes=[], transform=None, split='train', is_sliced=False,
+                 is_random_rotated=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.root_dir = root_dir
-        self.transform = transform
-        self.split = split
+        super().__init__(root_dir, split, classes)
+
+        self.is_random_rotated = is_random_rotated
         self.is_sliced = is_sliced
 
+        self.transform = transform
         self._maybe_download_data()
         self._maybe_make_slices()
 
@@ -66,7 +69,7 @@ class ShapeNetDataset(Dataset):
         self.point_clouds_names_train = pd.concat(
             [pc_df[pc_df['category'] == c][:int(0.85 * len(pc_df[pc_df['category'] == c]))].reset_index(drop=True) for c
              in classes])
-        self.point_clouds_names_valid = pd.concat([pc_df[pc_df['category'] == c][
+        self.point_clouds_names_val = pd.concat([pc_df[pc_df['category'] == c][
                                                    int(0.85 * len(pc_df[pc_df['category'] == c])):int(
                                                        0.9 * len(pc_df[pc_df['category'] == c]))].reset_index(drop=True)
                                                    for c in classes])
@@ -77,8 +80,8 @@ class ShapeNetDataset(Dataset):
     def __len__(self):
         if self.split == 'train':
             pc_names = self.point_clouds_names_train
-        elif self.split == 'valid':
-            pc_names = self.point_clouds_names_valid
+        elif self.split == 'val':
+            pc_names = self.point_clouds_names_val
         elif self.split == 'test':
             pc_names = self.point_clouds_names_test
         else:
@@ -88,8 +91,8 @@ class ShapeNetDataset(Dataset):
     def __getitem__(self, idx):
         if self.split == 'train':
             pc_names = self.point_clouds_names_train
-        elif self.split == 'valid':
-            pc_names = self.point_clouds_names_valid
+        elif self.split == 'val':
+            pc_names = self.point_clouds_names_val
         elif self.split == 'test':
             pc_names = self.point_clouds_names_test
         else:
@@ -97,21 +100,32 @@ class ShapeNetDataset(Dataset):
 
         pc_category, pc_filename = pc_names.iloc[idx].values
 
+        if self.is_random_rotated:
+            from scipy.spatial.transform import Rotation
+            random_rotation_matrix = Rotation.from_euler('z', np.random.randint(360), degrees=True).as_matrix()
+
         if self.is_sliced:
-            real = load_ply(join(self.root_dir, 'slices', 'real', pc_category, pc_filename))
+            partial = load_ply(join(self.root_dir, 'slices', 'partial', pc_category, pc_filename))
             # remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
-            target = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
+            gt = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
 
             if self.transform:
-                real = self.transform(real)
+                partial = self.transform(partial)
                 # remaining = self.transform(remaining)
-                target = self.transform(target)
+                gt = self.transform(gt)
 
-            return real, target, synth_id_to_number[pc_category]
+            if self.is_random_rotated:
+                partial = partial @ random_rotation_matrix
+                gt = gt @ random_rotation_matrix
+
+            return partial, gt, synth_id_to_number[pc_category]
         else:
             sample = load_ply(join(self.root_dir, pc_category, pc_filename))
             if self.transform:
                 sample = self.transform(sample)
+
+            if self.is_random_rotated:
+                sample = sample @ random_rotation_matrix
 
             return sample, synth_id_to_number[pc_category]
 
@@ -167,3 +181,14 @@ class ShapeNetDataset(Dataset):
         SlicedDatasetGenerator(self.root_dir, self.transform).generate(self._get_names(self.root_dir).iterrows())
 
         print("Dataset generated")
+
+    @classmethod
+    def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
+
+        if not classes:
+            classes = list(synth_id_to_category.keys())
+
+        return {synth_id_to_category[category_id]: ShapeNetDataset(root_dir=root_dir,
+                                                                   split='val',
+                                                                   classes=[category_id], **kwargs)
+                for category_id in classes}
