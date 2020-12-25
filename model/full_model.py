@@ -1,5 +1,9 @@
+from itertools import chain
+from typing import Iterator
+
 import torch
 import torch.nn as nn
+from torch.nn import Parameter
 
 from model.encoder import Encoder
 from model.hyper_network import HyperNetwork
@@ -27,6 +31,11 @@ class FullModel(nn.Module):
         self.target_network_config = config['target_network']
 
         self.point_generator_config = {'target_network_input': config['target_network_input']}
+
+    def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
+        return chain(self.random_encoder.parameters(),
+                     self.real_encoder.parameters(),
+                     self.hyper_network.parameters())
 
     def forward(self, partial, remaining, gt, epoch, device):
 
