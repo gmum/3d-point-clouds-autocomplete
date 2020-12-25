@@ -102,23 +102,24 @@ class ShapeNetDataset(BaseDataset):
 
         if self.is_random_rotated:
             from scipy.spatial.transform import Rotation
-            random_rotation_matrix = Rotation.from_euler('z', np.random.randint(360), degrees=True).as_matrix()
+            random_rotation_matrix = Rotation.from_euler('z', np.random.randint(360), degrees=True).as_matrix().astype(np.float32)
 
         if self.is_sliced:
-            partial = load_ply(join(self.root_dir, 'slices', 'partial', pc_category, pc_filename))
-            # remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
+            partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, pc_filename))
+            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
             gt = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
 
             if self.transform:
                 partial = self.transform(partial)
-                # remaining = self.transform(remaining)
+                remaining = self.transform(remaining)
                 gt = self.transform(gt)
 
             if self.is_random_rotated:
                 partial = partial @ random_rotation_matrix
+                remaining = remaining @ random_rotation_matrix
                 gt = gt @ random_rotation_matrix
 
-            return partial, gt, synth_id_to_number[pc_category]
+            return partial, remaining, gt, synth_id_to_number[pc_category]
         else:
             sample = load_ply(join(self.root_dir, pc_category, pc_filename))
             if self.transform:

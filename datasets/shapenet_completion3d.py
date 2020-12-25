@@ -7,10 +7,10 @@ from datasets.base_dataset import BaseDataset
 from datasets.shapenet import synth_id_to_category
 
 
-class ShapeNetCompletionDataset(BaseDataset):
+class ShapeNetCompletion3DDataset(BaseDataset):
 
     def __init__(self, root_dir='/home/datasets/completion', split='train', classes=[], model_list=None):
-        super(ShapeNetCompletionDataset, self).__init__(root_dir, split, classes)
+        super(ShapeNetCompletion3DDataset, self).__init__(root_dir, split, classes)
 
         if self.split == 'train':
             self.list_path = os.path.join(root_dir, 'train.list')
@@ -61,6 +61,6 @@ class ShapeNetCompletionDataset(BaseDataset):
         with open(list_path) as file:
             for line in file:
                 model_lists[line.strip().split('/')[0]].append(line.strip())
-        return {synth_id_to_category[category_id]: ShapeNetCompletionDataset(root_dir=root_dir, split='val',
-                                                                             model_list=model_list)
+        return {synth_id_to_category[category_id]: ShapeNetCompletion3DDataset(root_dir=root_dir, split='val',
+                                                                               model_list=model_list)
                 for category_id, model_list in model_lists.items()}

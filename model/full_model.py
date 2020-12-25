@@ -28,21 +28,23 @@ class FullModel(nn.Module):
 
         self.point_generator_config = {'target_network_input': config['target_network_input']}
 
-    def forward(self, partial, gt, epoch, device):
+    def forward(self, partial, remaining, gt, epoch, device):
 
         if partial.size(-1) == 3:
             partial.transpose_(partial.dim() - 2, partial.dim() - 1)
+
+        if remaining.size(-1) == 3:
+            remaining.transpose_(remaining.dim() - 2, remaining.dim() - 1)
 
         if gt.size(-1) == 3:
             gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
         if self.training:
-            codes, mu, logvar = self.random_encoder(partial)
+            codes, mu, logvar = self.random_encoder(remaining)
             real_mu = self.real_encoder(partial)
-
             target_networks_weights = self.hyper_network(torch.cat([codes, real_mu], 1))
         else:
-            _, random_mu, _ = self.random_encoder(partial)
+            _, random_mu, _ = self.random_encoder(remaining)
             real_mu = self.real_encoder(partial)
             target_networks_weights = self.hyper_network(torch.cat([random_mu, real_mu], 1))
 

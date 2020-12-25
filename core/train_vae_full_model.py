@@ -13,13 +13,12 @@ import torch.optim as optim
 import torch.utils.data
 from torch.utils.data import DataLoader
 
+from datasets import get_datasets
 from model.full_model import FullModel
 from utils.pcutil import plot_3d_point_cloud
 from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed
-from chamferdist import ChamferDistance
 from losses.champfer_loss import ChamferLoss
-from losses.chamfer_dist import ChamferDistance as CD
 
 
 def weights_init(m):
@@ -74,50 +73,23 @@ def main(config):
     if device.type == 'cuda':
         log.info(f'Current CUDA device: {torch.cuda.current_device()}')
 
-
-    dataset_name = config['dataset'].lower()
-    if dataset_name == 'shapenet' or True:
-        from datasets.shapenet import ShapeNetDataset
-        dataset = ShapeNetDataset(root_dir=config['data_dir'],
-                                  classes=config['classes'],
-                                  is_sliced=True, is_random_rotated=True)
-        val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['data_dir'],
-                                                                   classes=config['classes'],
-                                                                   is_sliced=True, is_random_rotated=True)
-    elif dataset_name == 'shapenet_msn':
-        from datasets.shapenetMSN import ShapeNet
-        dataset = ShapeNet(root_dir=config['data_dir'], train=True,
-                           real_size=config['real_size'],
-                           npoints=config['n_points'],
-                           num_of_samples=config['num_of_samples'],
-                           classes=config['classes'])
-    elif dataset_name == 'completion':
-        from datasets.completion import ShapeNetCompletionDataset
-        dataset = ShapeNetCompletionDataset(root_dir=config['data_dir'], split='train', classes=config['classes'])
-        val_dataset_dict = ShapeNetCompletionDataset.get_validation_datasets(config['data_dir'], classes=config['classes'])
-    else:
-        raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
-                         f'`faust`. Got: `{dataset_name}`')
+    train_dataset, val_dataset_dict, _ = get_datasets(config['dataset'])
 
     log.info("Selected {} classes. Loaded {} samples.".format(
         'all' if not config['classes'] else ','.join(config['classes']),
-        len(dataset)))
+        len(train_dataset)))
 
     val_dataloaders_dict = {cat_name: DataLoader(cat_ds, batch_size=config['eval_batch_size'], shuffle=True,
                                                  num_workers=config['num_workers'], pin_memory=True)
                             for cat_name, cat_ds in val_dataset_dict.items()}
 
-    train_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=config['shuffle'],
+    train_dataloader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=config['shuffle'],
                                   num_workers=config['num_workers'], drop_last=True, pin_memory=True)
 
     full_model = FullModel(config['full_model']).to(device)
     full_model.apply(weights_init)
 
     reconstruction_loss = ChamferLoss().to(device)
-
-    torch3d_cd_loss = ChamferDistance().to(device)
-    gr_cd_loss = CD().to(device)
-
 
     e_hn_optimizer = getattr(optim, config['optimizer']['E_HN']['type'])
     e_hn_optimizer = e_hn_optimizer(full_model.parameters(),
@@ -168,19 +140,19 @@ def main(config):
         for i, point_data in enumerate(train_dataloader, 1):
             e_hn_optimizer.zero_grad()
 
-            partial, gt, _ = point_data
+            partial, remaining, gt, _ = point_data
+
             partial = partial.to(device)
+            remaining = remaining.to(device)
             gt = gt.to(device)
 
-            reconstruction, logvar, mu = full_model(partial, gt, epoch, device)
+            reconstruction, logvar, mu = full_model(partial, remaining, gt, epoch, device)
 
             loss_r = torch.mean(
                 config['reconstruction_coef'] *
                 reconstruction_loss(gt.permute(0, 2, 1) + 0.5, reconstruction.permute(0, 2, 1) + 0.5))
 
-
             loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
-            # loss_kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
             loss_kld = torch.div(loss_kld, partial.shape[0])
             loss_all = loss_r + loss_kld
 
@@ -229,28 +201,21 @@ def main(config):
                 for cat_name, dl in val_dataloaders_dict.items():
 
                     total_loss_our_cd = 0.0
-                    total_loss_torch3d_cd = 0.0
-                    total_loss_gr_cd = 0.0
 
                     for i, point_data in enumerate(dl, 1):
 
-                        partial, gt, _ = point_data
+                        partial, remaining, gt, _ = point_data
                         partial = partial.to(device)
+                        remaining = remaining.to(device)
                         gt = gt.to(device)
 
-                        reconstruction = full_model(partial, gt, epoch, device)
+                        reconstruction = full_model(partial, remaining, gt, epoch, device)
 
                         loss_our_cd = torch.mean(
                             config['reconstruction_coef'] *
                             reconstruction_loss(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1)))
 
-                        loss_torch3d_cd = torch3d_cd_loss(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1),
-                                                          bidirectional=True)
-                        loss_gr_cd = gr_cd_loss(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1))
-
                         total_loss_our_cd += loss_our_cd.item()
-                        total_loss_torch3d_cd += loss_torch3d_cd.item()
-                        total_loss_gr_cd += loss_gr_cd.item()
 
                     partial = partial.cpu().numpy()
                     gt = gt.cpu().numpy()
@@ -260,7 +225,7 @@ def main(config):
                     val_plots.append(save_plot(reconstruction[0], epoch, cat_name, results_dir, 'val_rec'))
                     val_plots.append(save_plot(gt[0], epoch, cat_name, results_dir, 'val_gt'))
 
-                    val_losses[cat_name] = np.array([total_loss_our_cd/i, total_loss_torch3d_cd/i, 10000*total_loss_gr_cd/i])
+                    val_losses[cat_name] = np.array([total_loss_our_cd/i])
 
                 total = np.zeros(3)
                 for v in val_losses.values():

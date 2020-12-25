@@ -83,24 +83,28 @@ def main(config):
     #
     # Dataset
     #
-    dataset_name = config['dataset'].lower()
+    dataset_name = config['dataset_name'].lower()
     if dataset_name == 'shapenet':
         from datasets.shapenet import ShapeNetDataset
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
                                   classes=config['classes'],
                                   is_sliced=True, is_random_rotated=True)
+        val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['data_dir'],
+                                                                   classes=config['classes'],
+                                                                   is_sliced=True, is_random_rotated=True)
     elif dataset_name == 'shapenet_msn':
-        from datasets.shapenetMSN import ShapeNet
-        dataset = ShapeNet(root_dir=config['data_dir'], train=True,
+        from datasets.shapenet_msn import ShapeNet
+        dataset = ShapeNet(root_dir=config['data_dir'], split='train',
                            real_size=config['real_size'],
                            npoints=config['n_points'],
                            num_of_samples=config['num_of_samples'],
                            classes=config['classes'])
+        # TODO add validation datasets
     elif dataset_name == 'completion':
-        from datasets.completion import ShapeNetCompletionDataset
-        dataset = ShapeNetCompletionDataset(root_dir=config['data_dir'], split='train', classes=config['classes'])
-        val_dataset_dict = ShapeNetCompletionDataset.get_validation_datasets(config['data_dir'], classes=config['classes'])
-        test_dataset = ShapeNetCompletionDataset(root_dir=config['data_dir'], split='test')
+        from datasets.shapenet_completion3d import ShapeNetCompletion3DDataset
+        dataset = ShapeNetCompletion3DDataset(root_dir=config['data_dir'], split='train', classes=config['classes'])
+        val_dataset_dict = ShapeNetCompletion3DDataset.get_validation_datasets(config['data_dir'], classes=config['classes'])
+        test_dataset = ShapeNetCompletion3DDataset(root_dir=config['data_dir'], split='test')
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
@@ -120,11 +124,9 @@ def main(config):
                                  num_workers=config['num_workers'])
 
     hyper_network = aae.HyperNetwork(config, device).to(device)
-    # encoder = aae.EncoderForRandomPoints(config).to(device)
     real_data_encoder = aae.EncoderForRealPoints(config).to(device)
 
     hyper_network.apply(weights_init)
-    # encoder.apply(weights_init)
     real_data_encoder.apply(weights_init)
 
     torch3d_cd_loss = ChamferDistance().to(device)
@@ -154,21 +156,14 @@ def main(config):
                                           hyper_network.parameters()),
                                     **config['optimizer']['E_HN']['hyperparams'])
 
-
-
     if config['test']['execute']:
         test_epoch = config['test']['epoch']
         hyper_network.load_state_dict(torch.load(
             join(weights_path, f'{test_epoch:05}_G.pth')))
-        # encoder.load_state_dict(torch.load(
-        #     join(weights_path, f'{starting_epoch - 1:05}_E.pth')))
         real_data_encoder.load_state_dict(torch.load(
             join(weights_path, f'{test_epoch:05}_ER.pth')))
-        e_hn_optimizer.load_state_dict(torch.load(
-            join(weights_path, f'{test_epoch:05}_EGo.pth')))
 
         hyper_network.eval()
-        # encoder.eval()
         real_data_encoder.eval()
 
         benchmark_submission_dir = join(config['results_root'], 'benchmark', 'shapenet', 'test', 'partial', 'all')
@@ -264,7 +259,6 @@ def main(config):
             if gt.size(-1) == 3:
                 gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
-            # codes, mu, logvar = encoder(remaining_X)
             # codes, mu, logvar = encoder(partial)
             real_mu = real_data_encoder(partial)
 
