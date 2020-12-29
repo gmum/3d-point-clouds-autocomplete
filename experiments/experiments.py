@@ -142,30 +142,29 @@ def main(config):
     with torch.no_grad():
         for i, point_data in enumerate(points_dataloader, 1):
 
-            real_X, target_X, _ = point_data
+            real_X, remaining_X, target_X, _ = point_data
 
             real_X = real_X.to(device)
-            # remaining_X = remaining_X.to(device)
+            remaining_X = remaining_X.to(device)
             target_X = target_X.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
             if real_X.size(-1) == 3:
                 real_X.transpose_(real_X.dim() - 2, real_X.dim() - 1)
 
+            if remaining_X.size(-1) == 3:
+                remaining_X.transpose_(remaining_X.dim() - 2, remaining_X.dim() - 1)
+
             if target_X.size(-1) == 3:
                 target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
 
             if i - 1 < samples_amount:
                 real_x.append(real_X)
+                remaining_x.append(remaining_X)
                 target_x.append(target_X)
 
-            # codes, mu, logvar = encoder(target_X)
-            mu, logvar = 0.0, 0.0
-            # TODO rewrite | temp solution
-            codes = torch.zeros(target_X.shape[0], 1024).normal_(mean=0.0, std=0.015).to(device)
-
+            codes, mu, logvar = encoder(remaining_X)
             real_mu = real_data_encoder(real_X)
-
             target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
             X_rec = torch.zeros(target_X.shape).to(device)
