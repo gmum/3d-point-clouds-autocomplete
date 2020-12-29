@@ -12,6 +12,7 @@ import torch.utils.data
 from chamferdist import ChamferDistance
 from torch.utils.data import DataLoader
 
+from datasets.real_data import RealDataNPYDataset
 from losses.champfer_loss import ChamferLoss
 from losses.emd.emd_module import emdModule
 from models import aae
@@ -23,14 +24,12 @@ from utils.points import generate_points
 
 cudnn.benchmark = True
 
-
 def save_plot(X, epoch, k, results_dir, t):
     fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}_{k} epoch: {epoch}')
     fig_path = join(results_dir, 'samples', f'{epoch}_{k}_{t}.png')
     fig.savefig(fig_path)
     plt.close(fig)
     return fig_path
-
 
 def main(config):
     set_seed(config['seed'])
@@ -65,7 +64,7 @@ def main(config):
     #
     # Dataset
     #
-    dataset_name = config['dataset']['name'].lower()
+    dataset_name = config['dataset'].lower()
     if dataset_name == 'shapenet':
         from datasets.shapenet import ShapeNetDataset
         dataset = ShapeNetDataset(root_dir=config['data_dir'],
@@ -82,6 +81,8 @@ def main(config):
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
                          f'`faust`. Got: `{dataset_name}`')
+
+    dataset = RealDataNPYDataset(root_dir=config['data_dir'])
 
     log.info("Selected {} classes. Loaded {} samples.".format(
         'all' if not config['classes'] else ','.join(config['classes']), len(dataset)))

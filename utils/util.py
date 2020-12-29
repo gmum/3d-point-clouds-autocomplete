@@ -81,7 +81,9 @@ def get_weights_dir(config):
         weights_dir = config['weights_path']
     else:
         weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
-                           config['dataset'], get_classes_dir(config), 'weights')
+                           config['dataset']['name'], get_classes_dir(config), 'weights')
+        '''weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
+                           config['dataset']['name'], get_classes_dir(config), config['model_name'], 'weights')'''
     if exists(weights_dir):
         return weights_dir
     raise FileNotFoundError(weights_dir)
