@@ -11,6 +11,7 @@ import torch.nn.parallel
 import torch.utils.data
 from chamferdist import ChamferDistance
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from losses.champfer_loss import ChamferLoss
 from losses.emd.emd_module import emdModule
@@ -140,7 +141,7 @@ def main(config):
     samples_amount = np.max([int(e['amount']) for e in config['experiments'].values() if e['execute']])
 
     with torch.no_grad():
-        for i, point_data in enumerate(points_dataloader, 1):
+        for i, point_data in tqdm(enumerate(points_dataloader, 1), total=len(points_dataloader)):
 
             real_X, remaining_X, target_X, _ = point_data
 
@@ -208,9 +209,6 @@ def main(config):
             tg_log.log_images(saved_plots[:9], log_string)
 
         log.info(log_string)
-
-        # real_x = torch.cat(real_x)
-        # target_x = torch.cat(target_x)
 
         for experiment_name, experiment_dict in config['experiments'].items():
             if experiment_dict.pop('execute', False):
@@ -475,11 +473,11 @@ def different_number_of_points(rand_encoder, real_encoder, hyper_network, device
 def fixed(rand_encoder, real_encoder, hyper_network, device, target_x, remaining_x, real_x, results_dir, epoch,
           amount=30, mean=0.0, std=0.015, noises_per_item=3, triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
     log.info("Fixed")
-    target_x = target_x[:amount].cpu().numpy()
+    target_x = target_x[:amount]  # .cpu().numpy()
 
     real_x = real_x[:amount]
     mu_ar = real_encoder(real_x)
-    real_x = real_x.cpu().numpy()
+    # real_x = real_x.cpu().numpy()
 
     for i in range(noises_per_item):
         fixed_noise = torch.zeros(amount, 1024).normal_(mean=mean, std=std).to(device)
@@ -516,7 +514,7 @@ def fixed(rand_encoder, real_encoder, hyper_network, device, target_x, remaining
                 plt.close(fig)
 
             np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_noise'), np.array(fixed_noise[j].cpu()))
-            np.save(join(results_dir, 'fixed', f'{j}_{i}_real_x_part'), real_x[j])
+            np.save(join(results_dir, 'fixed', f'{j}_{i}_real_x_part'), real_x[j].cpu())
 
 
 experiment_functions_dict = {
