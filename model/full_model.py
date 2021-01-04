@@ -37,16 +37,18 @@ class FullModel(nn.Module):
                      self.real_encoder.parameters(),
                      self.hyper_network.parameters())
 
-    def forward(self, partial, remaining, gt, epoch, device):
+    def forward(self, partial, remaining, gt, epoch, device, noise=None):
 
         if partial.size(-1) == 3:
             partial.transpose_(partial.dim() - 2, partial.dim() - 1)
 
-        if remaining.size(-1) == 3:
+        if noise is None and remaining.size(-1) == 3:
             remaining.transpose_(remaining.dim() - 2, remaining.dim() - 1)
 
-        if gt.size(-1) == 3:
+        if noise is None and gt.size(-1) == 3:
             gt.transpose_(gt.dim() - 2, gt.dim() - 1)
+        else:
+            gt = torch.zeros([1, 3, 2048])  # TODO replace
 
         if self.training:
             codes, mu, logvar = self.random_encoder(remaining)
@@ -56,8 +58,10 @@ class FullModel(nn.Module):
             _, random_mu, _ = self.random_encoder(remaining)
             real_mu = self.real_encoder(partial)
             target_networks_weights = self.hyper_network(torch.cat([random_mu, real_mu], 1))
+            # target_networks_weights = self.hyper_network(torch.cat([noise, real_mu], 1))
 
         reconstruction = torch.zeros(gt.shape).to(device)
+
         for j, target_network_weights in enumerate(target_networks_weights):
             target_network = TargetNetwork(self.target_network_config, target_network_weights).to(device)
 

@@ -40,8 +40,8 @@ synth_id_to_number = {k: i for i, k in enumerate(synth_id_to_category.keys())}
 
 class ShapeNetDataset(BaseDataset):
 
-    def __init__(self, root_dir='/home/datasets/shapenet', classes=[], transform=None, split='train', is_sliced=False,
-                 is_random_rotated=False):
+    def __init__(self, root_dir='/home/datasets/shapenet', classes=[], transform=None, split='train',
+                 is_random_rotated=False, use_pcn_model_list=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
@@ -51,84 +51,85 @@ class ShapeNetDataset(BaseDataset):
         super().__init__(root_dir, split, classes)
 
         self.is_random_rotated = is_random_rotated
-        self.is_sliced = is_sliced
+        self.use_pcn_model_list = use_pcn_model_list
 
         self.transform = transform
         self._maybe_download_data()
         self._maybe_make_slices()
 
-        pc_df = self._get_names(self.root_dir + '/slices/real') if self.is_sliced else self._get_names(self.root_dir)
+        if self.use_pcn_model_list:
+            if self.split == 'train':
+                list_path = join(root_dir, 'train.list')
+            elif self.split == 'val':
+                list_path = join(root_dir, 'val.list')
+            else:
+                list_path = join(root_dir, 'test.list')
 
-        if classes:
-            if classes[0] not in synth_id_to_category.keys():
-                classes = [category_to_synth_id[c] for c in classes]
-            pc_df = pc_df[pc_df.category.isin(classes)].reset_index(drop=True)
+            with open(list_path) as file:
+                if classes:
+                    self.point_clouds_names = [line.strip() for line in file if line.strip().split('/')[0] in classes]
+                else:
+                    self.point_clouds_names = [line.strip() for line in file]
         else:
-            classes = synth_id_to_category.keys()
+            pc_df = self._get_names(self.root_dir)
 
-        self.point_clouds_names_train = pd.concat(
-            [pc_df[pc_df['category'] == c][:int(0.85 * len(pc_df[pc_df['category'] == c]))].reset_index(drop=True) for c
-             in classes])
-        self.point_clouds_names_val = pd.concat([pc_df[pc_df['category'] == c][
-                                                   int(0.85 * len(pc_df[pc_df['category'] == c])):int(
-                                                       0.9 * len(pc_df[pc_df['category'] == c]))].reset_index(drop=True)
-                                                   for c in classes])
-        self.point_clouds_names_test = pd.concat(
-            [pc_df[pc_df['category'] == c][int(0.9 * len(pc_df[pc_df['category'] == c])):].reset_index(drop=True) for c
-             in classes])
+            if classes:
+                if classes[0] not in synth_id_to_category.keys():
+                    classes = [category_to_synth_id[c] for c in classes]
+                pc_df = pc_df[pc_df.category.isin(classes)].reset_index(drop=True)
+            else:
+                classes = synth_id_to_category.keys()
+
+            if self.split == 'train':
+                # first 85%
+                self.point_clouds_names = pd.concat(
+                    [pc_df[pc_df['category'] == c][:int(0.85 * len(pc_df[pc_df['category'] == c]))]
+                         .reset_index(drop=True) for c in classes])
+            elif self.split == 'val':
+                # remaining 5%
+                self.point_clouds_names = pd.concat([pc_df[pc_df['category'] == c][
+                                                     int(0.85 * len(pc_df[pc_df['category'] == c])):int(
+                                                         0.9 * len(pc_df[pc_df['category'] == c]))]
+                                                    .reset_index(drop=True) for c in classes])
+            else:
+                # last 10%
+                self.point_clouds_names = pd.concat(
+                    [pc_df[pc_df['category'] == c][int(0.9 * len(pc_df[pc_df['category'] == c])):]
+                         .reset_index(drop=True) for c in classes])
 
     def __len__(self):
-        if self.split == 'train':
-            pc_names = self.point_clouds_names_train
-        elif self.split == 'val':
-            pc_names = self.point_clouds_names_val
-        elif self.split == 'test':
-            pc_names = self.point_clouds_names_test
-        else:
-            raise ValueError('Invalid split. Should be train, valid or test.')
-        return len(pc_names)
+        return len(self.point_clouds_names) * 4
 
     def __getitem__(self, idx):
-        if self.split == 'train':
-            pc_names = self.point_clouds_names_train
-        elif self.split == 'val':
-            pc_names = self.point_clouds_names_val
-        elif self.split == 'test':
-            pc_names = self.point_clouds_names_test
-        else:
-            raise ValueError('Invalid split. Should be train, valid or test.')
 
-        pc_category, pc_filename = pc_names.iloc[idx].values
+        if self.use_pcn_model_list:
+            pc_category, pc_filename = self.point_clouds_names[idx // 4].split('/')
+            pc_filename += '.ply'
+        else:
+            pc_category, pc_filename = self.point_clouds_names.iloc[idx // 4].values
 
         if self.is_random_rotated:
             from scipy.spatial.transform import Rotation
-            random_rotation_matrix = Rotation.from_euler('z', np.random.randint(360), degrees=True).as_matrix().astype(np.float32)
+            random_rotation_matrix = Rotation.from_euler('z', np.random.randint(360), degrees=True).as_matrix().astype(
+                np.float32)
 
-        if self.is_sliced:
-            partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, pc_filename))
-            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, pc_filename))
-            gt = load_ply(join(self.root_dir, pc_category, pc_filename.split('~')[1]))
+        scan_idx = str(idx % 4)
 
-            if self.transform:
-                partial = self.transform(partial)
-                remaining = self.transform(remaining)
-                gt = self.transform(gt)
+        partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, scan_idx + '~' + pc_filename))
+        remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, scan_idx + '~' + pc_filename))
+        gt = load_ply(join(self.root_dir, pc_category, pc_filename))
 
-            if self.is_random_rotated:
-                partial = partial @ random_rotation_matrix
-                remaining = remaining @ random_rotation_matrix
-                gt = gt @ random_rotation_matrix
+        if self.transform:
+            partial = self.transform(partial)
+            remaining = self.transform(remaining)
+            gt = self.transform(gt)
 
-            return partial, remaining, gt, synth_id_to_number[pc_category]
-        else:
-            sample = load_ply(join(self.root_dir, pc_category, pc_filename))
-            if self.transform:
-                sample = self.transform(sample)
+        if self.is_random_rotated:
+            partial = partial @ random_rotation_matrix
+            remaining = remaining @ random_rotation_matrix
+            gt = gt @ random_rotation_matrix
 
-            if self.is_random_rotated:
-                sample = sample @ random_rotation_matrix
-
-            return sample, synth_id_to_number[pc_category]
+        return partial, remaining, gt, synth_id_to_number[pc_category]
 
     def _get_names(self, path) -> pd.DataFrame:
         filenames = []
@@ -187,7 +188,10 @@ class ShapeNetDataset(BaseDataset):
     def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
 
         if not classes:
-            classes = list(synth_id_to_category.keys())
+            if kwargs.get('use_pcn_model_list'):
+                classes = ['02691156', '02933112', '02958343', '03001627', '03636649', '04256520', '04379243', '04530566']
+            else:
+                classes = list(synth_id_to_category.keys())
 
         return {synth_id_to_category[category_id]: ShapeNetDataset(root_dir=root_dir,
                                                                    split='val',

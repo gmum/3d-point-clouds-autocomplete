@@ -76,7 +76,7 @@ def main(config):
     train_dataset, val_dataset_dict, _ = get_datasets(config['dataset'])
 
     log.info("Selected {} classes. Loaded {} samples.".format(
-        'all' if not config['classes'] else ','.join(config['classes']),
+        'all' if not config['dataset']['classes'] else ','.join(config['classes']),
         len(train_dataset)))
 
     val_dataloaders_dict = {cat_name: DataLoader(cat_ds, batch_size=config['eval_batch_size'], shuffle=True,
@@ -162,6 +162,8 @@ def main(config):
 
             loss_all.backward()
             e_hn_optimizer.step()
+
+        scheduler.step()
 
         losses_e.append(total_loss_r)
         losses_kld.append(total_loss_kld)
