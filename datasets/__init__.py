@@ -4,13 +4,13 @@ def get_datasets(config):
     if dataset_name == 'shapenet':
         from datasets.shapenet import ShapeNetDataset
         train_dataset = ShapeNetDataset(root_dir=config['path'], classes=config['classes'], split='train',
-                                        is_random_rotated=True, use_pcn_model_list=True)
+                                        is_random_rotated=config['is_rotated'], use_pcn_model_list=True)
         val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['path'],
                                                                    classes=config['classes'],
-                                                                   is_random_rotated=True,
+                                                                   is_random_rotated=config['is_rotated'],
                                                                    use_pcn_model_list=True)
         test_dataset = ShapeNetDataset(root_dir=config['path'], classes=config['classes'], split='test',
-                                       is_random_rotated=True, use_pcn_model_list=True)
+                                       is_random_rotated=config['is_rotated'], use_pcn_model_list=True)
     elif dataset_name == 'completion':
         from datasets.shapenet_completion3d import ShapeNetCompletion3DDataset
         train_dataset = ShapeNetCompletion3DDataset(root_dir=config['path'], split='train', classes=config['classes'])
