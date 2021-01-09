@@ -48,17 +48,19 @@ class FullModel(nn.Module):
         if noise is None and gt.size(-1) == 3:
             gt.transpose_(gt.dim() - 2, gt.dim() - 1)
         else:
-            gt = torch.zeros([1, 3, 2048])  # TODO replace
+            gt = torch.zeros([1, 3, 2048])  # TODO change gt to gt_shape
 
         if self.training:
             codes, mu, logvar = self.random_encoder(remaining)
             real_mu = self.real_encoder(partial)
             target_networks_weights = self.hyper_network(torch.cat([codes, real_mu], 1))
         else:
-            _, random_mu, _ = self.random_encoder(remaining)
+            if noise is None:
+                _, random_mu, _ = self.random_encoder(remaining)
+            else:
+                random_mu = noise
             real_mu = self.real_encoder(partial)
             target_networks_weights = self.hyper_network(torch.cat([random_mu, real_mu], 1))
-            # target_networks_weights = self.hyper_network(torch.cat([noise, real_mu], 1))
 
         reconstruction = torch.zeros(gt.shape).to(device)
 

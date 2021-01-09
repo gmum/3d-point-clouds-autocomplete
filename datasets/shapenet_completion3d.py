@@ -45,7 +45,7 @@ class ShapeNetCompletion3DDataset(BaseDataset):
             gt = self._load_h5(os.path.join(self.root_dir, self.split, 'gt', model_name + '.h5'))
         else:
             gt = partial
-        return partial, gt, model_name
+        return partial, 0, gt, model_name
 
     @classmethod
     def get_validation_datasets(cls, root_dir, classes=[], **kwargs):

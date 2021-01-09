@@ -6,15 +6,17 @@ from os.path import join, exists
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import torch.backends.cudnn as cudnn
+
 import torch.nn.parallel
 import torch.utils.data
 from chamferdist import ChamferDistance
 from torch.utils.data import DataLoader
 
+from datasets import get_datasets
 from datasets.real_data import RealDataNPYDataset
 from losses.champfer_loss import ChamferLoss
 from losses.emd.emd_module import emdModule
+from model.full_model import FullModel
 from models import aae
 
 from utils.pcutil import plot_3d_point_cloud
@@ -22,14 +24,6 @@ from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed, get_weights_dir
 from utils.points import generate_points
 
-cudnn.benchmark = True
-
-def save_plot(X, epoch, k, results_dir, t):
-    fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}_{k} epoch: {epoch}')
-    fig_path = join(results_dir, 'samples', f'{epoch}_{k}_{t}.png')
-    fig.savefig(fig_path)
-    plt.close(fig)
-    return fig_path
 
 def main(config):
     set_seed(config['seed'])
@@ -64,38 +58,63 @@ def main(config):
     #
     # Dataset
     #
-    dataset_name = config['dataset'].lower()
-    if dataset_name == 'shapenet':
-        from datasets.shapenet import ShapeNetDataset
-        dataset = ShapeNetDataset(root_dir=config['data_dir'],
-                                  classes=config['classes'],
-                                  is_sliced=True,
-                                  split='test')
-    elif dataset_name == 'shapenet_msn':
-        from datasets.shapenetMSN import ShapeNet
-        dataset = ShapeNet(root_dir=config['data_dir'], train=False,
-                           real_size=config['real_size'],
-                           npoints=config['n_points'],
-                           num_of_samples=config['num_of_samples'],
-                           classes=config['classes'])
-    else:
-        raise ValueError(f'Invalid dataset name. Expected `shapenet` or '
-                         f'`faust`. Got: `{dataset_name}`')
+    train_dataset, val_dataset_dict, test_dataset = get_datasets(config['dataset'])
 
-    dataset = RealDataNPYDataset(root_dir=config['data_dir'])
+    test_dataset = RealDataNPYDataset(root_dir=config['data_dir'])  # TODO refactor
 
-    log.info("Selected {} classes. Loaded {} samples.".format(
-        'all' if not config['classes'] else ','.join(config['classes']), len(dataset)))
+    '''
+    val_dataloaders_dict = {cat_name: DataLoader(cat_ds, batch_size=config['eval_batch_size'], shuffle=True,
+                                                 num_workers=config['num_workers'], pin_memory=True)
+                            for cat_name, cat_ds in val_dataset_dict.items()}
 
-    points_dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True,
-                                   num_workers=config["num_workers"], drop_last=True, pin_memory=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=config['shuffle'],
+                                  num_workers=config['num_workers'], drop_last=True, pin_memory=True)
+    '''
 
-    #
-    # Models
-    #
-    hyper_network = aae.HyperNetwork(config, device).to(device)
-    encoder = aae.EncoderForRandomPoints(config).to(device)
-    real_data_encoder = aae.EncoderForRealPoints(config).to(device)
+
+
+
+    '''
+    test = np.transpose(test_dataset[0][0], (1, 0))
+    train = np.transpose(train_dataset[0][0], (1, 0))
+    
+    fig = plot_3d_point_cloud(test[0], test[1], test[2], in_u_sphere=True, show=False)
+    fig.savefig(join(results_dir, 'fixed', f'111reconstructed.png'))
+    plt.close(fig)
+
+    fig = plot_3d_point_cloud(train[0], train[1], train[2], in_u_sphere=True,
+                              show=False)
+    fig.savefig(join(results_dir, 'fixed', f'222reconstructed.png'))
+    plt.close(fig)
+    # exit(0)
+    
+
+    from utils.util import show_3d_cloud
+
+
+    show_3d_cloud(test_dataset[0][0])
+    show_3d_cloud(train_dataset[0][0])
+
+    show_3d_cloud(np.concatenate([train_dataset[0][0], test_dataset[0][0]]))
+
+    # exit(0)
+    
+    
+    from sklearn.preprocessing import StandardScaler, scale
+    scaler = StandardScaler()
+
+    partial = np.array(list(map(lambda x: x[0], train_dataset)))
+    # remaining = np.array(map(lambda x: x[1], train_dataset))
+    scaler.fit(np.reshape(partial, newshape=(-1, 3)))
+    '''
+
+
+
+    # test_dataloader = DataLoader(train_dataset)
+
+    full_model = FullModel(config['full_model']).to(device)
+
+    reconstruction_loss = ChamferLoss().to(device)
 
     losses_functions = {
         'chamfer our': ChamferLoss().to(device),
@@ -103,121 +122,21 @@ def main(config):
         'chamfer dist': ChamferDistance().to(device),
     }
 
-    '''
-    if config['reconstruction_loss'].lower() == 'chamfer':
-        loss_id = 0
-        reconstruction_loss = losses_functions['chamfer our']
-    elif config['reconstruction_loss'].lower() == 'emd':
-        loss_id = 1
-        reconstruction_loss = losses_functions['msn emd']
-    elif config['reconstruction_loss'].lower() == 'chamferdist':
-        loss_id = 2
-        reconstruction_loss = losses_functions['chamfer dist']
-    else:
-        raise ValueError(f'Invalid reconstruction loss. Accepted `chamfer` or '
-                         f'`earth_mover`, got: {config["reconstruction_loss"]}')
-    '''
+
     log.info("Weights for epoch: %s" % epoch)
 
     log.info("Loading weights...")
-    hyper_network.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_G.pth')))
-    encoder.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_E.pth')))
-    real_data_encoder.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_ER.pth')))
+    full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth'),
+                                          map_location='cuda:' + str(config['gpu'])))
 
-    hyper_network.eval()
-    encoder.eval()
-    real_data_encoder.eval()
+    # samples_amount = np.max([int(e['amount']) for e in config['experiments'].values() if e['execute']])
 
-    total_loss_eg = 0.0
-    total_loss_chamfer_our = 0.0
-    total_loss_emd_msn = 0.0
-    total_loss_chamfer_dist = 0.0
-    total_loss_kld = 0.0
-
-    real_x = []
-    remaining_x = []
-    target_x = []
-
-    samples_amount = np.max([int(e['amount']) for e in config['experiments'].values() if e['execute']])
+    full_model.eval()
 
     with torch.no_grad():
-        for i, point_data in enumerate(points_dataloader, 1):
-
-            real_X, target_X, _ = point_data
-
-            real_X = real_X.to(device)
-            # remaining_X = remaining_X.to(device)
-            target_X = target_X.to(device)
-
-            # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
-            if real_X.size(-1) == 3:
-                real_X.transpose_(real_X.dim() - 2, real_X.dim() - 1)
-
-            if target_X.size(-1) == 3:
-                target_X.transpose_(target_X.dim() - 2, target_X.dim() - 1)
-
-            if i - 1 < samples_amount:
-                real_x.append(real_X)
-                target_x.append(target_X)
-
-            # codes, mu, logvar = encoder(target_X)
-            mu, logvar = 0.0, 0.0
-            # TODO rewrite | temp solution
-            codes = torch.zeros(target_X.shape[0], 1024).normal_(mean=0.0, std=0.015).to(device)
-
-            real_mu = real_data_encoder(real_X)
-
-            target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
-
-            X_rec = torch.zeros(target_X.shape).to(device)
-
-            for j, target_network_weights in enumerate(target_networks_weights):
-                target_network = aae.TargetNetwork(config, target_network_weights).to(device)
-                target_network_input = generate_points(config=config, epoch=epoch, size=(target_X.shape[2], target_X.shape[1]))
-                X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
-
-            loss_chamfer_our = torch.mean(losses_functions['chamfer our'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5))
-            dist, _ = losses_functions['msn emd'](target_X.permute(0, 2, 1) + 0.5, X_rec.permute(0, 2, 1) + 0.5, 0.002, 10000)
-            loss_emd_msn = torch.mean(torch.sqrt(dist))
-            loss_chamfer_dist = losses_functions['chamfer dist'](X_rec.permute(0, 2, 1) + 0.5, target_X.permute(0, 2, 1) + 0.5, reduction='mean')
-
-            # loss_kld = 0.5 * (torch.exp(logvar) + torch.pow(mu, 2) - 1 - logvar).sum()
-
-            # loss_eg = loss_chamfer_our + loss_kld
-
-            # total_loss_kld += loss_kld.item()
-            # total_loss_eg += loss_eg.item()
-
-            total_loss_chamfer_our += loss_chamfer_our.item()
-            total_loss_emd_msn += loss_emd_msn.item()
-            total_loss_chamfer_dist += loss_chamfer_dist.item()
-
-        log_string = f'Loss_CO: {total_loss_chamfer_our / i:.4f} ' \
-                     f'Loss_EMD_MSN: {total_loss_emd_msn / i:.4f} ' \
-                     f'Loss_cd: {total_loss_chamfer_dist / i:.4f} '
-
-        real_X = real_X.cpu().numpy()
-        target_X = target_X.cpu().numpy()
-        X_rec = X_rec.detach().cpu().numpy()
-
-        saved_plots = []
-        for k in range(min(5, X_rec.shape[0])):
-            saved_plots.append(save_plot(real_X[k], epoch, k, results_dir, 'cut'))
-            saved_plots.append(save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed'))
-            saved_plots.append(save_plot(target_X[k], epoch, k, results_dir, 'real'))
-
-        if config['use_telegram_logging']:
-            tg_log.log_images(saved_plots[:9], log_string)
-
-        log.info(log_string)
-
-        # real_x = torch.cat(real_x)
-        # target_x = torch.cat(target_x)
-
         for experiment_name, experiment_dict in config['experiments'].items():
             if experiment_dict.pop('execute', False):
-                experiment_functions_dict[experiment_name](encoder, real_data_encoder, hyper_network, device, target_x,
-                                                           remaining_x, real_x, results_dir, epoch, **experiment_dict)
+                experiment_functions_dict[experiment_name](full_model, device, test_dataset, results_dir, epoch, **experiment_dict)
 
 
 def get_hyper_network_weights(remaining_x, real_x, rand_encoder, real_encoder, hyper_network):
@@ -474,51 +393,80 @@ def different_number_of_points(rand_encoder, real_encoder, hyper_network, device
             plt.close(fig)
 
 
-def fixed(rand_encoder, real_encoder, hyper_network, device, target_x, remaining_x, real_x, results_dir, epoch,
-          amount=30, mean=0.0, std=0.015, noises_per_item=3, triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
+def fixed(full_model, device, dataset, results_dir, epoch,
+          amount=30, mean=0.0, std=0.015, noises_per_item=50, triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
     log.info("Fixed")
-    target_x = target_x[:amount].cpu().numpy()
 
-    real_x = real_x[:amount]
-    mu_ar = real_encoder(real_x)
-    real_x = real_x.cpu().numpy()
+    dataloader = DataLoader(dataset)
 
-    for i in range(noises_per_item):
-        fixed_noise = torch.zeros(amount, 1024).normal_(mean=mean, std=std).to(device)
+    for i, data in enumerate(dataloader):
 
-        weights_fixed = hyper_network(torch.cat([fixed_noise, mu_ar], 1))
+        partial, _, _, idx = data
+        partial = partial.to(device)
 
-        for j, weights in enumerate(weights_fixed):
-            target_network = aae.TargetNetwork(config, weights).to(device)
+        from utils.util import show_3d_cloud
 
-            target_network_input = generate_points(config=config, epoch=epoch, size=(target_x.shape[2], target_x.shape[1]))
-            fixed_rec = torch.transpose(target_network(target_network_input.to(device)), 0, 1).cpu().numpy()
-            np.save(join(results_dir, 'fixed', f'{j}_{i}_target_network_input'), np.array(target_network_input))
-            np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstruction'), fixed_rec)
+        for j in range(noises_per_item):
+            fixed_noise = torch.zeros(1, 1024).normal_(mean=mean, std=std).to(device)
 
-            fig = plot_3d_point_cloud(fixed_rec[0], fixed_rec[1], fixed_rec[2], in_u_sphere=True, show=False)
-            fig.savefig(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstructed.png'))
+            reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)[0]
+            reconstruction = reconstruction.cpu()
+
+            np.save(join(results_dir, 'fixed', f'{i}_{j}_fixed_noise'), np.array(fixed_noise.cpu().numpy()))
+            np.save(join(results_dir, 'fixed', f'{i}_{j}_reconstruction'), reconstruction.numpy())
+
+            fig = plot_3d_point_cloud(reconstruction[0], reconstruction[1], reconstruction[2], in_u_sphere=True, show=False)
+            fig.savefig(join(results_dir, 'fixed', f'{i}_{j}_fixed_reconstructed.png'))
             plt.close(fig)
 
-            if triangulation_config['execute']:
-                from utils.sphere_triangles import generate
+            # dataset.inverse_scale_to_scene(idx, reconstruction.T.numpy())
 
-                target_network_input, triangulation = generate(triangulation_config['method'], triangulation_config['depth'])
+            np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'), dataset.inverse_scale(idx, reconstruction.T.numpy()))
 
-                with open(join(results_dir, 'fixed', f'{j}_{i}_triangulation.pickle'), 'wb') as triangulation_file:
-                    pickle.dump(triangulation, triangulation_file)
+            '''
+            for j, weights in enumerate(weights_fixed):
+                target_network = aae.TargetNetwork(config, weights).to(device)
 
+                target_network_input = generate_points(config=config, epoch=epoch, size=(target_x.shape[2], target_x.shape[1]))
                 fixed_rec = torch.transpose(target_network(target_network_input.to(device)), 0, 1).cpu().numpy()
-                np.save(join(results_dir, 'fixed', f'{j}_{i}_target_network_input_triangulation'),
-                        np.array(target_network_input))
-                np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstruction_triangulation'), fixed_rec)
+                np.save(join(results_dir, 'fixed', f'{j}_{i}_target_network_input'), np.array(target_network_input))
+                np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstruction'), fixed_rec)
 
                 fig = plot_3d_point_cloud(fixed_rec[0], fixed_rec[1], fixed_rec[2], in_u_sphere=True, show=False)
-                fig.savefig(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstructed_triangulation.png'))
+                fig.savefig(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstructed.png'))
                 plt.close(fig)
 
-            np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_noise'), np.array(fixed_noise[j].cpu()))
-            np.save(join(results_dir, 'fixed', f'{j}_{i}_real_x_part'), real_x[j])
+                if triangulation_config['execute']:
+                    from utils.sphere_triangles import generate
+
+                    target_network_input, triangulation = generate(triangulation_config['method'], triangulation_config['depth'])
+
+                    with open(join(results_dir, 'fixed', f'{j}_{i}_triangulation.pickle'), 'wb') as triangulation_file:
+                        pickle.dump(triangulation, triangulation_file)
+
+                    fixed_rec = torch.transpose(target_network(target_network_input.to(device)), 0, 1).cpu().numpy()
+                    np.save(join(results_dir, 'fixed', f'{j}_{i}_target_network_input_triangulation'),
+                            np.array(target_network_input))
+                    np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstruction_triangulation'), fixed_rec)
+
+                    fig = plot_3d_point_cloud(fixed_rec[0], fixed_rec[1], fixed_rec[2], in_u_sphere=True, show=False)
+                    fig.savefig(join(results_dir, 'fixed', f'{j}_{i}_fixed_reconstructed_triangulation.png'))
+                    plt.close(fig)
+
+                np.save(join(results_dir, 'fixed', f'{j}_{i}_fixed_noise'), np.array(fixed_noise[j].cpu()))
+                np.save(join(results_dir, 'fixed', f'{j}_{i}_real_x_part'), real_x[j])
+            '''
+        partial = partial.cpu()
+        fig = plot_3d_point_cloud(partial[0][0], partial[0][1], partial[0][2], in_u_sphere=True, show=False)
+        fig.savefig(join(results_dir, 'fixed', f'{i}_partial.png'))
+        plt.close(fig)
+
+        np.save(join(results_dir, 'fixed', f'{i}_partial'), np.array(partial.cpu().numpy()))
+
+
+def compute_metrics(full_model, device, dataset, results_dir, epoch):
+
+    pass
 
 
 experiment_functions_dict = {

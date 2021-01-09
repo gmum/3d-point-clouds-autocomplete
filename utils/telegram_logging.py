@@ -5,6 +5,10 @@ import requests
 
 class TelegramLogger(object):
 
+    @staticmethod
+    def getLogger(config):
+        return TelegramLogger(config['bot_token'], config['chat_id'])
+
     def __init__(self, bot_token: str, chat_id: str, disable_req_log: bool = True):
         self._api_url = f'https://api.telegram.org/bot{bot_token}/'
         self._message_url = self._api_url + 'sendMessage'

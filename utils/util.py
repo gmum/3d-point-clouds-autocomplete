@@ -9,6 +9,9 @@ import numpy as np
 
 import torch
 
+from utils.pcutil import plot_3d_point_cloud
+import matplotlib.pyplot as plt
+
 
 def setup_logging(log_dir):
     makedirs(log_dir, exist_ok=True)
@@ -80,10 +83,10 @@ def get_weights_dir(config):
     if config.get('weights_path'):
         weights_dir = config['weights_path']
     else:
-        weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
-                           config['dataset']['name'], get_classes_dir(config), 'weights')
         '''weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
-                           config['dataset']['name'], get_classes_dir(config), config['model_name'], 'weights')'''
+                           config['dataset']['name'], get_classes_dir(config), 'weights')'''
+        weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
+                           config['dataset']['name'], get_classes_dir(config), config['model_name'], 'weights')
     if exists(weights_dir):
         return weights_dir
     raise FileNotFoundError(weights_dir)
@@ -96,13 +99,35 @@ def get_classes_dir(config):
 def get_distribution_dir(config):
     normed_str = ''
     if config['target_network_input']['normalization']['enable']:
-        normalization_type = config['target_network_input']['normalization']['type']
-
-        if normalization_type == 'progressive':
+        if config['target_network_input']['normalization']['type'] == 'progressive':
             norm_max_epoch = config['target_network_input']['normalization']['epoch']
             normed_str = 'normed_progressive_to_epoch_%d' % norm_max_epoch
 
     return '%s%s' % ('uniform', '_' + normed_str if normed_str else '')
+
+
+def get_model_name(config):
+    model_name = ''
+    encoders_num = 0
+    real_size = config['full_model']['real_encoder']['output_size']
+    random_size = config['full_model']['random_encoder']['output_size']
+
+    if real_size > 0:
+        encoders_num += 1
+        model_name += str(real_size)
+
+    if random_size > 0:
+        encoders_num += 1
+        model_name += 'x' + str(random_size) if real_size >0 else str(random_size)
+
+    model_name = str(encoders_num) + 'e' + model_name
+
+    model_name += config['training']['lr_scheduler']['type']
+
+    for k, v in config['training']['lr_scheduler']['hyperparams'].items():
+        model_name += '_' + k + str(v).replace(' ', '')
+
+    return model_name
 
 
 def show_3d_cloud(points_cloud):
@@ -119,3 +144,10 @@ def replace_and_rename_pcd_file(source, dest):
             for filename in listdir(join(source, model_id, sample)):
                 copyfile(join(source, model_id, sample, filename), join(dest, f'{model_id}_{sample}_{filename}'))
 
+
+def save_plot(X, epoch, k, results_dir, t):
+    fig = plot_3d_point_cloud(X[0], X[1], X[2], in_u_sphere=True, show=False, title=f'{t}_{k} epoch: {epoch}')
+    fig_path = join(results_dir, f'{epoch}_{k}_{t}.png')
+    fig.savefig(fig_path)
+    plt.close(fig)
+    return fig_path
