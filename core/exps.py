@@ -2,6 +2,7 @@
 import json
 from os.path import join
 
+from tqdm import tqdm
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -63,7 +64,7 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
 
             cat_results = {}
 
-            for data in dl:
+            for data in tqdm(dl, total=len(dl)):
                 partial, _, _, _ = data
                 partial = partial.to(device)
 
