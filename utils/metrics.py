@@ -66,10 +66,10 @@ def emd_approx(sample, ref):
     emd_norm = emd / float(N)  # (B,)
     return emd_norm
 
-def dist_chamfer(x, y):
-    from losses.champfer_loss import ChamferLoss
-    from utils.util import cuda_setup
-    chamfer_loss = ChamferLoss().to(cuda_setup())
+def dist_chamfer(x, y, chamfer_loss):
+    # from losses.champfer_loss import ChamferLoss
+    # from utils.util import cuda_setup
+    # chamfer_loss = ChamferLoss().to(cuda_setup())
     P = chamfer_loss.batch_pairwise_dist(x, y)
     return P.min(1)[0], P.min(2)[0]
 
@@ -109,7 +109,7 @@ def EMD_CD(sample_pcs, ref_pcs, batch_size, reduced=True):
     return results
 
 
-def _pairwise_EMD_CD_(sample_pcs, ref_pcs, batch_size):
+def _pairwise_EMD_CD_(sample_pcs, ref_pcs, batch_size, chamfer_loss):
     N_sample = sample_pcs.shape[0]
     N_ref = ref_pcs.shape[0]
     all_cd = []
@@ -128,7 +128,7 @@ def _pairwise_EMD_CD_(sample_pcs, ref_pcs, batch_size):
             sample_batch_exp = sample_batch.view(1, -1, 3).expand(batch_size_ref, -1, -1)
             sample_batch_exp = sample_batch_exp.contiguous()
 
-            dl, dr = dist_chamfer(sample_batch_exp, ref_batch)
+            dl, dr = dist_chamfer(sample_batch_exp, ref_batch, chamfer_loss)
             cd_lst.append((dl.mean(dim=1) + dr.mean(dim=1)).view(1, -1))
 
             emd_batch = emd_approx(sample_batch_exp, ref_batch)
@@ -193,10 +193,10 @@ def mmd_cov(all_dist):
     }
 
 
-def compute_all_metrics(sample_pcs, ref_pcs, batch_size):
+def compute_all_metrics(sample_pcs, ref_pcs, batch_size, chamfer_loss):
     results = {}
 
-    M_rs_cd, M_rs_emd = _pairwise_EMD_CD_(ref_pcs, sample_pcs, batch_size)
+    M_rs_cd, M_rs_emd = _pairwise_EMD_CD_(ref_pcs, sample_pcs, batch_size, chamfer_loss)
 
     res_cd = mmd_cov(M_rs_cd.t())
     results.update({

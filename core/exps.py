@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
+from losses.champfer_loss import ChamferLoss
 from utils.pcutil import plot_3d_point_cloud
 
 
@@ -52,8 +53,11 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
                           mean=0.0, std=0.015):
     dataloaders_dict = {cat_name: DataLoader(cat_ds, pin_memory=True, batch_size=1, num_workers=num_workers)
                         for cat_name, cat_ds in datasets_dict.items()}
+    chamfer_loss = ChamferLoss().to(device)
+
     with torch.no_grad():
         results = {}
+
         for cat_name, dl in dataloaders_dict.items():
             cat_gt = []
             for data in dl:
@@ -78,7 +82,7 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
                 obj_recs = torch.transpose(torch.cat(obj_recs), 1, 2).contiguous()
 
                 from utils.metrics import compute_all_metrics
-                for k, v in compute_all_metrics(obj_recs, cat_gt, batch_size).items():
+                for k, v in compute_all_metrics(obj_recs, cat_gt, batch_size, chamfer_loss).items():
                     cat_results[k] = cat_results.get(k, 0.0) + v.item()
 
                 from utils.metrics import jsd_between_point_cloud_sets
