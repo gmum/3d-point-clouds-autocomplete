@@ -5,7 +5,7 @@ start.sh
 init.sh
 data
 
-utils/pytorch_structural_losses/StructuralLossesBackend.cpython-38-x86_64-linux-gnu.so
+utils/pytorch_structural_losses/StructuralLossesBackend*
 utils/pytorch_structural_losses/build/
 losses/emd/build/
 losses/emd/dist/

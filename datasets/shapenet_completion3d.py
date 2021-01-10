@@ -64,3 +64,4 @@ class ShapeNetCompletion3DDataset(BaseDataset):
         return {synth_id_to_category[category_id]: ShapeNetCompletion3DDataset(root_dir=root_dir, split='val',
                                                                                model_list=model_list)
                 for category_id, model_list in model_lists.items()}
+

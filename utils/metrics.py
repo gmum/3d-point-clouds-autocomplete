@@ -203,11 +203,12 @@ def compute_all_metrics(sample_pcs, ref_pcs, batch_size):
         "%s-CD" % k: v for k, v in res_cd.items()
     })
 
+
     res_emd = mmd_cov(M_rs_emd.t())
     results.update({
         "%s-EMD" % k: v for k, v in res_emd.items()
     })
-
+    '''
     M_rr_cd, M_rr_emd = _pairwise_EMD_CD_(ref_pcs, ref_pcs, batch_size)
     M_ss_cd, M_ss_emd = _pairwise_EMD_CD_(sample_pcs, sample_pcs, batch_size)
 
@@ -220,7 +221,7 @@ def compute_all_metrics(sample_pcs, ref_pcs, batch_size):
     results.update({
         "1-NN-EMD-%s" % k: v for k, v in one_nn_emd_res.items() if 'acc' in k
     })
-
+    '''
     return results
 
 

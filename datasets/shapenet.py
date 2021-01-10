@@ -41,7 +41,7 @@ synth_id_to_number = {k: i for i, k in enumerate(synth_id_to_category.keys())}
 class ShapeNetDataset(BaseDataset):
 
     def __init__(self, root_dir='/home/datasets/shapenet', classes=[], transform=None, split='train',
-                 is_random_rotated=False, use_pcn_model_list=False):
+                 is_random_rotated=False, num_samples=4, use_pcn_model_list=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
@@ -52,10 +52,11 @@ class ShapeNetDataset(BaseDataset):
 
         self.is_random_rotated = is_random_rotated
         self.use_pcn_model_list = use_pcn_model_list
+        self.num_samples = num_samples
 
         self.transform = transform
-        self._maybe_download_data()
-        self._maybe_make_slices()
+        # self._maybe_download_data()
+        # self._maybe_make_slices()
 
         if self.use_pcn_model_list:
             if self.split == 'train':
@@ -98,22 +99,22 @@ class ShapeNetDataset(BaseDataset):
                          .reset_index(drop=True) for c in classes])
 
     def __len__(self):
-        return len(self.point_clouds_names) * 4
+        return len(self.point_clouds_names) * self.num_samples
 
     def __getitem__(self, idx):
 
         if self.use_pcn_model_list:
-            pc_category, pc_filename = self.point_clouds_names[idx // 4].split('/')
+            pc_category, pc_filename = self.point_clouds_names[idx // self.num_samples].split('/')
             pc_filename += '.ply'
         else:
-            pc_category, pc_filename = self.point_clouds_names.iloc[idx // 4].values
+            pc_category, pc_filename = self.point_clouds_names.iloc[idx // self.num_samples].values
 
         if self.is_random_rotated:
             from scipy.spatial.transform import Rotation
             random_rotation_matrix = Rotation.from_euler('z', np.random.randint(360), degrees=True).as_matrix().astype(
                 np.float32)
 
-        scan_idx = str(idx % 4)
+        scan_idx = str(idx % self.num_samples)
 
         partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, scan_idx + '~' + pc_filename))
         remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, scan_idx + '~' + pc_filename))
@@ -185,15 +186,23 @@ class ShapeNetDataset(BaseDataset):
         print("Dataset generated")
 
     @classmethod
-    def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
-
+    def _get_datasets_for_classes(cls, root_dir, split, classes=[], **kwargs):
         if not classes:
             if kwargs.get('use_pcn_model_list'):
-                classes = ['02691156', '02933112', '02958343', '03001627', '03636649', '04256520', '04379243', '04530566']
+                classes = ['02691156', '02933112', '02958343', '03001627', '03636649', '04256520', '04379243',
+                           '04530566']
             else:
                 classes = list(synth_id_to_category.keys())
 
         return {synth_id_to_category[category_id]: ShapeNetDataset(root_dir=root_dir,
-                                                                   split='val',
+                                                                   split=split,
                                                                    classes=[category_id], **kwargs)
                 for category_id in classes}
+
+    @classmethod
+    def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
+        return cls._get_datasets_for_classes(root_dir, 'val', classes, **kwargs)
+
+    @classmethod
+    def get_test_datasets(cls, root_dir, classes=[], **kwargs):
+        return cls._get_datasets_for_classes(root_dir, 'test', classes, **kwargs)

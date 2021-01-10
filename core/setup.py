@@ -77,9 +77,12 @@ def weights_init(m):
         if m.bias is not None:
             torch.nn.init.constant_(m.bias, 0)
 
-def restore_model_state(weights_path, epoch, full_model, optimizer=None, scheduler=None):
+def restore_model_state(weights_path, gpu_id, epoch, full_model, optimizer=None, scheduler=None):
 
-    full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth')))
+    # full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth')))
+
+    full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth'),
+                                          map_location='cuda:' + str(gpu_id)))
 
     if optimizer is not None:
         optimizer.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_O.pth')))

@@ -34,9 +34,7 @@ def main(config):
         dirs_to_create = ('weights', 'samples', 'metrics')
         weights_path = join(result_dir_path, 'weights')
     elif run_mode == 'experiments':
-        dirs_to_create = ('interpolations', 'sphere', 'points_interpolation', 'different_number_points',
-                          'fixed', 'reconstruction', 'sphere_triangles', 'sphere_triangles_interpolation')
-        # TODO get list from experiment_functions_dict
+        dirs_to_create = tuple(experiment_functions_dict.keys())
         weights_path = join(get_results_dir_path(config, 'training'), 'weights')
     else:
         raise ValueError("mode should be `training` or `experiments`")
@@ -71,9 +69,9 @@ def main(config):
 
     if latest_epoch > 0:
         if run_mode == "training":
-            restore_model_state(weights_path, latest_epoch, full_model, optimizer, scheduler)
+            restore_model_state(weights_path, config['setup']['gpu_id'], latest_epoch, full_model, optimizer, scheduler)
         elif run_mode == "experiments":
-            restore_model_state(weights_path, latest_epoch, full_model)
+            restore_model_state(weights_path, config['setup']['gpu_id'], latest_epoch, full_model)
     elif run_mode == "experiments":
         raise FileNotFoundError("no weights found at ", weights_path)
 
