@@ -10,14 +10,7 @@ import os
 import random
 
 from datasets.base_dataset import BaseDataset
-
-
-def resample_pcd(pcd, n):
-    """Drop or duplicate points so that pcd has exactly n points"""
-    idx = np.random.permutation(pcd.shape[0])
-    if idx.shape[0] < n:
-        idx = np.concatenate([idx, np.random.randint(pcd.shape[0], size=n - pcd.shape[0])])
-    return pcd[idx[:n]]
+from utils.util import resample_pcd
 
 
 class ShapeNet(BaseDataset):

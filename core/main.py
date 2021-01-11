@@ -1,4 +1,3 @@
-import argparse
 import json
 import logging
 
@@ -10,6 +9,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+from core.arg_parser import parse_config
 from core.epoch_loops import train_epoch, val_epoch
 from core.exps import experiment_functions_dict
 from datasets import get_datasets
@@ -20,7 +20,7 @@ from core.setup import seed_setup, logging_setup, cuda_setup, results_dir_setup,
     get_results_dir_path, restore_metrics, weights_init
 from utils.telegram_logging import TelegramLogger
 
-from utils.util import find_latest_epoch, save_plot, get_model_name
+from utils.util import find_latest_epoch, save_plot, get_model_name, show_3d_cloud
 
 
 def main(config):
@@ -77,7 +77,7 @@ def main(config):
 
     # endregion Setup
 
-    train_dataset, val_dataset_dict, test_dataset = get_datasets(config['dataset'])
+    train_dataset, val_dataset_dict, test_dataset_dict = get_datasets(config['dataset'])
 
     log.info(f'Dataset loaded for classes: {[cat_name for cat_name in val_dataset_dict.keys()]}')
 
@@ -168,21 +168,10 @@ def main(config):
             for experiment_name, experiment_dict in config['experiments'].items():
                 if experiment_dict.pop('execute', False):
                     log.info(experiment_name)
-                    experiment_functions_dict[experiment_name](full_model, device, test_dataset, result_dir_path,
+                    experiment_functions_dict[experiment_name](full_model, device, test_dataset_dict, result_dir_path,
                                                                latest_epoch, **experiment_dict)
 
     exit(0)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', default=None, type=str,
-                        help='config file path')
-    args = parser.parse_args()
-
-    config = None
-    if args.config is not None and args.config.endswith('.json'):
-        with open(args.config) as f:
-            config = json.load(f)
-    assert config is not None
-
-    main(config)
+    main(parse_config())

@@ -10,11 +10,14 @@ def get_datasets(config):
                                                                    is_random_rotated=config['is_rotated'],
                                                                    num_samples=config['num_samples'],
                                                                    use_pcn_model_list=True)
+
         test_dataset_dict = ShapeNetDataset.get_test_datasets(root_dir=config['path'],
                                                               classes=config['classes'],
                                                               is_random_rotated=config['is_rotated'],
                                                               num_samples=config['num_samples'],
-                                                              use_pcn_model_list=True)
+                                                              use_pcn_model_list=True,
+                                                              is_gen=config['gen_test_set'])
+
     elif dataset_name == 'completion':
         from datasets.shapenet_completion3d import ShapeNetCompletion3DDataset
         train_dataset = ShapeNetCompletion3DDataset(root_dir=config['path'], split='train', classes=config['classes'])

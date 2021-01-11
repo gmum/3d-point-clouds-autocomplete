@@ -7,6 +7,7 @@ from numpy.linalg import norm
 
 # Import CUDA version of approximate EMD, from https://github.com/zekunhao1995/pcgan-pytorch//:
 from utils.pytorch_structural_losses.match_cost import match_cost
+from utils.pytorch_structural_losses.nn_distance import nn_distance
 
 
 def _average_precision(query: torch.Tensor, retrieved: torch.Tensor) -> torch.Tensor:
@@ -128,7 +129,11 @@ def _pairwise_EMD_CD_(sample_pcs, ref_pcs, batch_size, chamfer_loss):
             sample_batch_exp = sample_batch.view(1, -1, 3).expand(batch_size_ref, -1, -1)
             sample_batch_exp = sample_batch_exp.contiguous()
 
+            # dl, dr = nn_distance(sample_batch_exp, ref_batch)
+
             dl, dr = dist_chamfer(sample_batch_exp, ref_batch, chamfer_loss)
+
+
             cd_lst.append((dl.mean(dim=1) + dr.mean(dim=1)).view(1, -1))
 
             emd_batch = emd_approx(sample_batch_exp, ref_batch)

@@ -151,3 +151,11 @@ def save_plot(X, epoch, k, results_dir, t):
     fig.savefig(fig_path)
     plt.close(fig)
     return fig_path
+
+
+def resample_pcd(pcd, n):
+    """Drop or duplicate points so that pcd has exactly n points"""
+    idx = np.random.permutation(pcd.shape[0])
+    if idx.shape[0] < n:
+        idx = np.concatenate([idx, np.random.randint(pcd.shape[0], size=n - pcd.shape[0])])
+    return pcd[idx[:n]]

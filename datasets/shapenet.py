@@ -11,6 +11,7 @@ import pandas as pd
 from datasets.base_dataset import BaseDataset
 from utils.plyfile import load_ply
 from datasets.utils.dataset_generator import SlicedDatasetGenerator
+from utils.util import resample_pcd
 
 synth_id_to_category = {
     '02691156': 'airplane', '02773838': 'bag', '02801938': 'basket',
@@ -41,7 +42,7 @@ synth_id_to_number = {k: i for i, k in enumerate(synth_id_to_category.keys())}
 class ShapeNetDataset(BaseDataset):
 
     def __init__(self, root_dir='/home/datasets/shapenet', classes=[], transform=None, split='train',
-                 is_random_rotated=False, num_samples=4, use_pcn_model_list=False):
+                 is_random_rotated=False, num_samples=4, use_pcn_model_list=False, is_gen=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
@@ -53,6 +54,7 @@ class ShapeNetDataset(BaseDataset):
         self.is_random_rotated = is_random_rotated
         self.use_pcn_model_list = use_pcn_model_list
         self.num_samples = num_samples
+        self.is_gen = is_gen
 
         self.transform = transform
         # self._maybe_download_data()
@@ -116,9 +118,14 @@ class ShapeNetDataset(BaseDataset):
 
         scan_idx = str(idx % self.num_samples)
 
-        partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, scan_idx + '~' + pc_filename))
-        remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, scan_idx + '~' + pc_filename))
-        gt = load_ply(join(self.root_dir, pc_category, pc_filename))
+        if self.is_gen:
+            partial = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'right', pc_category, pc_filename)), 1024)
+            remaining = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'left', pc_category, pc_filename)), 1024)
+            gt = load_ply(join(self.root_dir, 'test_gen', 'gt', pc_category, pc_filename))
+        else:
+            partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, scan_idx + '~' + pc_filename))
+            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, scan_idx + '~' + pc_filename))
+            gt = load_ply(join(self.root_dir, pc_category, pc_filename))
 
         if self.transform:
             partial = self.transform(partial)

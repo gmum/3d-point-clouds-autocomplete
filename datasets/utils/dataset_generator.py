@@ -4,28 +4,7 @@ from os.path import join
 import numpy as np
 import ray
 
-from utils.plyfile import load_ply
-
-
-def quick_save_ply_file(points, filename):
-    pl = len(points)
-    header = \
-        "ply\n" \
-        "format binary_little_endian 1.0\n" \
-        "element vertex " + str(pl) + "\n" \
-        "property float x\n" \
-        "property float y\n" \
-        "property float z\n" \
-        "end_header\n"
-
-    dtype_vertex = [('vertex', '<f4', (3))]
-    vertex = np.empty(pl, dtype=dtype_vertex)
-    vertex['vertex'] = points
-
-    with open(filename, 'wb') as fp:
-        fp.write(bytes(header, encoding='utf-8'))
-        fp.write(vertex.tobytes())
-        fp.close()
+from utils.plyfile import load_ply, quick_save_ply_file
 
 
 class HyperPlane(object):

@@ -213,7 +213,7 @@ def main(config):
         real_x = torch.cat(real_x)
         remaining_x = torch.cat(remaining_x)
         target_x = torch.cat(target_x)
-        
+
         for experiment_name, experiment_dict in config['experiments'].items():
             if experiment_dict.pop('execute', False):
                 experiment_functions_dict[experiment_name](encoder, real_data_encoder, hyper_network, device, target_x,

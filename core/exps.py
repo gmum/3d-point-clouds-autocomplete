@@ -8,8 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
+from datasets.utils.dataset_generator import HyperPlane
 from losses.champfer_loss import ChamferLoss
+from utils.metrics import compute_all_metrics, jsd_between_point_cloud_sets
 from utils.pcutil import plot_3d_point_cloud
+from utils.util import show_3d_cloud, resample_pcd
 
 
 def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, std=0.015, noises_per_item=50,
@@ -58,12 +61,16 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
     with torch.no_grad():
         results = {}
 
+        plane_points = np.zeros((3, 3))
+        plane_points[1][2] = 1
+        plane_points[2][0] = 1
+
         for cat_name, dl in dataloaders_dict.items():
             cat_gt = []
             for data in dl:
-                _, _, gt, _ = data
-                gt = gt.to(device)
-                cat_gt.append(gt)
+                _, remaining, _, _ = data
+                remaining = remaining.to(device)
+                cat_gt.append(remaining)
             cat_gt = torch.cat(cat_gt).contiguous()
 
             cat_results = {}
@@ -77,20 +84,49 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
                 for j in range(len(cat_gt)):
                     fixed_noise = torch.zeros(1, 1024).normal_(mean=mean, std=std).to(device)
                     reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)
-                    obj_recs.append(reconstruction)
 
-                obj_recs = torch.transpose(torch.cat(obj_recs), 1, 2).contiguous()
+                    pc = reconstruction.cpu().detach().numpy()[0]
 
-                from utils.metrics import compute_all_metrics
+                    l, r = pc[1].min(), pc[1].max()
+                    pc = pc.T
+
+                    points = plane_points.copy()
+                    counter = 0
+
+                    while True:
+                        m = np.divide(l + r, 2)
+                        points[0][1] = m
+                        points[1][1] = m
+                        points[2][1] = m
+
+                        right = HyperPlane.get_plane_from_3_points(points).check_point(pc) > 0
+                        right_points = pc[right]
+                        left_points = pc[~right]
+
+                        counter += 1
+                        if counter == 10000000:
+                            print("not 1024")
+                            obj_recs.append(torch.from_numpy(resample_pcd(left_points, 1024)).unsqueeze(0).to(device))
+                            break
+
+                        if len(left_points) > len(right_points):
+                            l = m
+                        elif len(left_points) < len(right_points):
+                            r = m
+                        else:
+                            obj_recs.append(torch.from_numpy(left_points).unsqueeze(0).to(device))
+                            break
+
+                obj_recs = torch.cat(obj_recs)
+
                 for k, v in compute_all_metrics(obj_recs, cat_gt, batch_size, chamfer_loss).items():
                     cat_results[k] = cat_results.get(k, 0.0) + v.item()
-
-                from utils.metrics import jsd_between_point_cloud_sets
-                cat_results['jsd'] = cat_results.get('jsd', 0.0) + jsd_between_point_cloud_sets(obj_recs.cpu().detach().numpy(), cat_gt.cpu().numpy())
+                cat_results['jsd'] = cat_results.get('jsd', 0.0) + jsd_between_point_cloud_sets(
+                    obj_recs.cpu().detach().numpy(), cat_gt.cpu().numpy())
             results[cat_name] = cat_results
             print(cat_name, cat_results)
 
-        with open(join(results_dir, 'evaluate_generativity', str(epoch)+'eval_gen_by_cat.json'), mode='w') as f:
+        with open(join(results_dir, 'evaluate_generativity', str(epoch) + 'eval_gen_by_cat.json'), mode='w') as f:
             json.dump(results, f)
 
 
