@@ -86,36 +86,7 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
                     reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)
 
                     pc = reconstruction.cpu().detach().numpy()[0]
-
-                    l, r = pc[1].min(), pc[1].max()
-                    pc = pc.T
-
-                    points = plane_points.copy()
-                    counter = 0
-
-                    while True:
-                        m = np.divide(l + r, 2)
-                        points[0][1] = m
-                        points[1][1] = m
-                        points[2][1] = m
-
-                        right = HyperPlane.get_plane_from_3_points(points).check_point(pc) > 0
-                        right_points = pc[right]
-                        left_points = pc[~right]
-
-                        counter += 1
-                        if counter == 10000000:
-                            print("not 1024")
-                            obj_recs.append(torch.from_numpy(resample_pcd(left_points, 1024)).unsqueeze(0).to(device))
-                            break
-
-                        if len(left_points) > len(right_points):
-                            l = m
-                        elif len(left_points) < len(right_points):
-                            r = m
-                        else:
-                            obj_recs.append(torch.from_numpy(left_points).unsqueeze(0).to(device))
-                            break
+                    obj_recs.append(torch.from_numpy(pc.T[pc[1].argsort()[:1024]]).unsqueeze(0).to(device))
 
                 obj_recs = torch.cat(obj_recs)
 

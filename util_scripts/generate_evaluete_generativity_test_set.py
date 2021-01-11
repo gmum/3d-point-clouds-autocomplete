@@ -52,16 +52,14 @@ def div_left_right_bin_search(dataset_dir, init_plane_points, pc_paths):
 
 def div_left_right_min_y(dataset_dir, pc_paths):
     for i, pc_path in tqdm(enumerate(pc_paths), total=len(pc_paths)):
+        pc = load_ply(join(dataset_dir, pc_path))
 
-        pc = load_ply(join(dataset_dir, pc_path))  # 2048, 3
-
-        left_points = pc[pc.T[1].argsort()[:1024]]
         right_points = pc[pc.T[1].argsort()[1024:]]
+        left_points = pc[pc.T[1].argsort()[:1024]]
 
-        pass
-
-
-
+        quick_save_ply_file(left_points, join(dataset_dir, 'test_gen', 'left', pc_path))
+        quick_save_ply_file(right_points, join(dataset_dir, 'test_gen', 'right', pc_path))
+        quick_save_ply_file(pc, join(dataset_dir, 'test_gen', 'gt', pc_path))
 
 
 def main(config):
@@ -79,6 +77,8 @@ def main(config):
         makedirs(join(dataset_dir, 'test_gen', 'right', cat), exist_ok=True)
         makedirs(join(dataset_dir, 'test_gen', 'gt', cat), exist_ok=True)
 
+    div_left_right_min_y(dataset_dir, pc_paths)
+
     not_existed_pc = []
 
     for pc_path in pc_paths:
@@ -95,7 +95,7 @@ def main(config):
         if load_ply(join(dataset_dir, 'test_gen', 'left', pc_path)).shape[0] != 1024:
             not_1024.append(pc_path)
 
-    div_left_right_min_y(dataset_dir, not_1024)
+
 
 
 if __name__ == '__main__':
