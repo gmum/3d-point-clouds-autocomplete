@@ -2,6 +2,8 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
+from model.full_model import FullModel
+
 
 def train_epoch(epoch, full_model, optimizer, loader, device, rec_loss_function, loss_coef=0.05):
     full_model.train()
@@ -23,12 +25,14 @@ def train_epoch(epoch, full_model, optimizer, loader, device, rec_loss_function,
         loss_r = torch.mean(
             loss_coef * rec_loss_function(gt.permute(0, 2, 1) + 0.5, reconstruction.permute(0, 2, 1) + 0.5))
 
-        loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
-        loss_kld = torch.div(loss_kld, partial.shape[0])
-        loss_all = loss_r + loss_kld
-
+        if full_model.model_mode in [FullModel.Mode.DOUBLE_ENCODER, FullModel.Mode.RANDOM_ENCODER]:
+            loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
+            loss_kld = torch.div(loss_kld, partial.shape[0])
+            loss_all = loss_r + loss_kld
+            loss_kld += loss_kld.item()
+        else:
+            loss_all = loss_r
         loss_r += loss_r.item()
-        loss_kld += loss_kld.item()
         loss_all += loss_all.item()
 
         loss_all.backward()
