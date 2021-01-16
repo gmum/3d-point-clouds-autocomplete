@@ -124,6 +124,10 @@ def main(config):
                       config['training']['loss_coef'])
 
             is_new_best = epoch_val_losses['total'][0] < best_epoch_loss
+
+            if is_new_best:
+                best_epoch_loss = epoch_val_losses['total'][0]
+
             val_losses.append(epoch_val_losses['total'])
 
             log_string = f'val results[{config["training"]["loss_coef"]}*our_cd]:\n'

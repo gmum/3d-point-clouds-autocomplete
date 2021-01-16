@@ -5,7 +5,8 @@
         "path": "",
         "classes": [],
         "is_rotated": false,
-        "num_samples": 1
+        "num_samples": 1,
+        "gen_test_set": false
     },
     "training": {
         "optimizer": {
