@@ -33,9 +33,11 @@ def main(config):
     if run_mode == 'training':
         dirs_to_create = ('weights', 'samples', 'metrics')
         weights_path = join(result_dir_path, 'weights')
+        metrics_path = join(result_dir_path, 'metrics')
     elif run_mode == 'experiments':
         dirs_to_create = tuple(experiment_functions_dict.keys())
         weights_path = join(get_results_dir_path(config, 'training'), 'weights')
+        metrics_path = join(get_results_dir_path(config, 'training'), 'metrics')
     else:
         raise ValueError("mode should be `training` or `experiments`")
 
@@ -69,11 +71,15 @@ def main(config):
 
     if latest_epoch > 0:
         if run_mode == "training":
-            restore_model_state(weights_path, config['setup']['gpu_id'], latest_epoch, full_model, optimizer, scheduler)
+            latest_epoch = restore_model_state(weights_path, metrics_path, config['setup']['gpu_id'], latest_epoch,
+                                               "latest", full_model, optimizer, scheduler)
         elif run_mode == "experiments":
-            restore_model_state(weights_path, config['setup']['gpu_id'], latest_epoch, full_model)
+            latest_epoch = restore_model_state(weights_path, metrics_path, config['setup']['gpu_id'], latest_epoch,
+                                               config['experiments']['epoch'], full_model)
     elif run_mode == "experiments":
         raise FileNotFoundError("no weights found at ", weights_path)
+
+    log.info(f'Restored epoch : {latest_epoch}')
 
     # endregion Setup
 
@@ -83,7 +89,6 @@ def main(config):
 
     if run_mode == 'training':
         samples_path = join(result_dir_path, 'samples')
-        metrics_path = join(result_dir_path, 'metrics')
         train_dataloader = DataLoader(train_dataset, pin_memory=True, **config['training']['dataloader']['train'])
         val_dataloaders_dict = {cat_name: DataLoader(cat_ds, pin_memory=True, **config['training']['dataloader']['val'])
                                 for cat_name, cat_ds in val_dataset_dict.items()}
@@ -93,11 +98,12 @@ def main(config):
             val_losses = []
         else:
             train_losses, val_losses, best_epoch_loss = restore_metrics(metrics_path, latest_epoch)
-        for epoch in range(latest_epoch+1, config['training']['max_epoch'] + 1):
+
+        for epoch in range(latest_epoch + 1, config['training']['max_epoch'] + 1):
             start_epoch_time = datetime.now()
             log.debug("Epoch: %s" % epoch)
 
-            full_model, optimizer, epoch_loss_all, epoch_loss_kld, epoch_loss_r, latest_partial, latest_gt, latest_rec\
+            full_model, optimizer, epoch_loss_all, epoch_loss_kld, epoch_loss_r, latest_partial, latest_gt, latest_rec \
                 = train_epoch(epoch, full_model, optimizer, train_dataloader, device, reconstruction_loss,
                               config['training']['loss_coef'])
             scheduler.step()
@@ -120,8 +126,9 @@ def main(config):
             if config['telegram_logger']['enable']:
                 tg_log.log_images(train_plots[:9], log_string)
 
-            epoch_val_losses, epoch_val_samples = val_epoch(epoch, full_model, device, val_dataloaders_dict, val_dataset_dict.keys(), reconstruction_loss,
-                      config['training']['loss_coef'])
+            epoch_val_losses, epoch_val_samples = val_epoch(epoch, full_model, device, val_dataloaders_dict,
+                                                            val_dataset_dict.keys(), reconstruction_loss,
+                                                            config['training']['loss_coef'])
 
             is_new_best = epoch_val_losses['total'][0] < best_epoch_loss
 
@@ -146,7 +153,8 @@ def main(config):
                 val_plots.append(save_plot(sample[2], epoch, cat_name, samples_path, 'val_rec'))
 
             if config['telegram_logger']['enable']:
-                chosen_plot_idx = np.random.choice(np.arange(len(val_plots)/3, dtype=np.int), int(np.min([3, len(val_plots)/3])), replace=False)
+                chosen_plot_idx = np.random.choice(np.arange(len(val_plots) / 3, dtype=np.int),
+                                                   int(np.min([3, len(val_plots) / 3])), replace=False)
                 plots_to_log = []
                 for idx in chosen_plot_idx:
                     plots_to_log.extend(val_plots[3 * idx:3 * idx + 3])
@@ -157,7 +165,7 @@ def main(config):
                 torch.save(optimizer.state_dict(), join(weights_path, f'{epoch:05}_O.pth'))
                 torch.save(scheduler.state_dict(), join(weights_path, f'{epoch:05}_S.pth'))
 
-                np.save(join(metrics_path, f'{epoch:05}_train'), np.array(train_losses))
+                np.save(join(metrics_path, f'{epoch:05}_train'), np.array(train_losses))  # TODO add epoch id to the array
                 np.save(join(metrics_path, f'{epoch:05}_val'), np.array(val_losses))
 
                 log_string = "Epoch: %s saved" % epoch
@@ -169,13 +177,14 @@ def main(config):
         full_model.eval()
 
         with torch.no_grad():
-            for experiment_name, experiment_dict in config['experiments'].items():
+            for experiment_name, experiment_dict in config['experiments']['settings'].items():
                 if experiment_dict.pop('execute', False):
                     log.info(experiment_name)
                     experiment_functions_dict[experiment_name](full_model, device, test_dataset_dict, result_dir_path,
                                                                latest_epoch, **experiment_dict)
 
     exit(0)
+
 
 if __name__ == '__main__':
     main(parse_config())

@@ -47,21 +47,24 @@
         "max_epoch": 2000
     },
     "experiments": {
-        "fixed": {
-            "execute": false,
-            "mean": 0.0,
-            "std": 0.05,
-            "amount": 64,
-            "triangulation_config": {
+        "epoch": "best_val",
+        "settings": {
+            "fixed": {
+                "execute": false,
+                "mean": 0.0,
+                "std": 0.05,
+                "amount": 64,
+                "triangulation_config": {
+                    "execute": true,
+                    "method": "edge",
+                    "depth": 2
+                }
+            },
+            "evaluate_generativity": {
                 "execute": true,
-                "method": "edge",
-                "depth": 2
+                "batch_size": 25,
+                "num_workers" : 8
             }
-        },
-        "evaluate_generativity": {
-            "execute": true,
-            "batch_size": 25,
-            "num_workers" : 8
         }
     },
 

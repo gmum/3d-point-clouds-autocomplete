@@ -77,8 +77,18 @@ def weights_init(m):
         if m.bias is not None:
             torch.nn.init.constant_(m.bias, 0)
 
-def restore_model_state(weights_path, gpu_id, epoch, full_model, optimizer=None, scheduler=None):
 
+def restore_model_state(weights_path, metrics_path, gpu_id, epoch, restore_policy, full_model, optimizer=None,
+                        scheduler=None):
+
+    if restore_policy == "latest":
+        pass
+    elif restore_policy == "best_val":
+        val_losses = np.load(join(metrics_path, f'{epoch:05}_val.npy'), allow_pickle=True)
+        epoch = np.argmin(val_losses)
+    else:
+        # TODO handle value error
+        epoch = int(restore_policy)
     # full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth')))
 
     full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth'),
@@ -89,6 +99,7 @@ def restore_model_state(weights_path, gpu_id, epoch, full_model, optimizer=None,
 
     if scheduler is not None:
         scheduler.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_S.pth')))
+    return epoch
 
 
 def restore_metrics(metrics_path, epoch):
