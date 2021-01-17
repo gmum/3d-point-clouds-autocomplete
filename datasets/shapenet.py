@@ -31,7 +31,7 @@ synth_id_to_category = {
     '03928116': 'piano', '03938244': 'pillow', '03948459': 'pistol',
     '03991062': 'pot', '04004475': 'printer', '04074963': 'remote_control',
     '04090263': 'rifle', '04099429': 'rocket', '04225987': 'skateboard',
-    '04256520': 'sofa', '04330267': 'stove', '04530566': 'vessel',
+    '04256520': 'sofa', '04330267': 'stove', '04530566': 'watercraft',
     '04554684': 'washer', '02858304': 'boat', '02992529': 'cellphone'
 }
 

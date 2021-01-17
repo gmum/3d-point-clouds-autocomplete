@@ -160,7 +160,8 @@ def main(config):
                     plots_to_log.extend(val_plots[3 * idx:3 * idx + 3])
                 tg_log.log_images(plots_to_log, log_string)
 
-            if epoch % config['training']['state_save_frequency'] == 0 or is_new_best:
+            if (epoch % config['training']['state_save_frequency'] == 0 or is_new_best) \
+                    and epoch > config['training'].get('min_save_epoch', 0):
                 torch.save(full_model.state_dict(), join(weights_path, f'{epoch:05}_model.pth'))
                 torch.save(optimizer.state_dict(), join(weights_path, f'{epoch:05}_O.pth'))
                 torch.save(scheduler.state_dict(), join(weights_path, f'{epoch:05}_S.pth'))

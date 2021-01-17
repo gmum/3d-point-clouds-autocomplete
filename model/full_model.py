@@ -52,7 +52,7 @@ class FullModel(nn.Module):
         self.point_generator_config = {'target_network_input': config['target_network_input']}
 
     def _get_latent(self, partial, remaining, noise=None):
-        # TODO think about refactor (create new class ModelStrategy)
+        # TODO think about refactor (extract to he new class ModelStrategy)
         if self.model_mode == FullModel.Mode.DOUBLE_ENCODER:
             if self.training:
                 codes, mu, logvar = self.random_encoder(remaining)
