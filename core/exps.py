@@ -82,7 +82,7 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
                 obj_recs = []
 
                 for j in range(len(cat_gt)):
-                    fixed_noise = torch.zeros(1, 1024).normal_(mean=mean, std=std).to(device)
+                    fixed_noise = torch.zeros(1, 128).normal_(mean=mean, std=std).to(device)  # TODO get from model random_encoder output size
                     reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)
 
                     pc = reconstruction.cpu().detach().numpy()[0]
