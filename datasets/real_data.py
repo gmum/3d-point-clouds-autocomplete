@@ -3,15 +3,7 @@ from os.path import join
 
 import numpy as np
 from datasets.base_dataset import BaseDataset
-from utils.util import show_3d_cloud
-
-# TODO replace
-def resample_pcd(pcd, n):
-    """Drop or duplicate points so that pcd has exactly n points"""
-    idx = np.random.permutation(pcd.shape[0])
-    if idx.shape[0] < n:
-        idx = np.concatenate([idx, np.random.randint(pcd.shape[0], size=n - pcd.shape[0])])
-    return pcd[idx[:n]]
+from utils.util import resample_pcd
 
 
 class RealDataNPYDataset(BaseDataset):
@@ -21,9 +13,12 @@ class RealDataNPYDataset(BaseDataset):
 
         self.scenes = []
         self.objs = []
+        self.boxes = []
 
         for f in listdir(self.root_dir):
-            if f.startswith('object'):
+            if f.startswith('object_box'):
+                self.boxes.append(f)
+            elif f.startswith('object'):
                 self.objs.append(f)
             elif f.startswith('scen'):
                 self.scenes.append(f)
@@ -42,6 +37,21 @@ class RealDataNPYDataset(BaseDataset):
         pcd_center, scale = self._get_scales(pcd)
         pcd = (pcd - pcd_center) / scale
         return resample_pcd(pcd, 1024), 0, 0, idx
+
+    def get_full_object(self, idx):
+        return np.load(join(self.root_dir, self.objs[idx])).astype(np.float32)
+
+    def get_scene(self, idx):
+        if self.scenes:
+            return np.load(join(self.root_dir, self.scenes[idx])).astype(np.float32)
+        else:
+            raise ValueError("Dataset does not include scenes")
+
+    def get_obj_box(self, idx):
+        if self.scenes:
+            return np.load(join(self.root_dir, self.boxes[idx])).astype(np.float32)
+        else:
+            raise ValueError("Dataset does not include object boxes")
 
     def inverse_scale_to_scene(self, idx, scaled_pcd):
         scene = np.load(join(self.root_dir, self.scenes[idx])).astype(np.float32)

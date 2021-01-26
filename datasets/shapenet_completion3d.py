@@ -4,7 +4,7 @@ import h5py
 import numpy as np
 
 from datasets.base_dataset import BaseDataset
-from datasets.shapenet import synth_id_to_category
+from datasets.utils.shapenet_category_mapping import synth_id_to_category
 
 
 class ShapeNetCompletion3DDataset(BaseDataset):

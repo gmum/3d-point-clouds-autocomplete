@@ -4,7 +4,8 @@ def get_datasets(config):
     if dataset_name == 'shapenet':
         from datasets.shapenet import ShapeNetDataset
         train_dataset = ShapeNetDataset(root_dir=config['path'], classes=config['classes'], split='train',
-                                        is_random_rotated=config['is_rotated'], use_pcn_model_list=True)
+                                        is_random_rotated=config['is_rotated'], num_samples=config['num_samples'],
+                                        use_pcn_model_list=True)
         val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['path'],
                                                                    classes=config['classes'],
                                                                    is_random_rotated=config['is_rotated'],
@@ -21,9 +22,14 @@ def get_datasets(config):
     elif dataset_name == 'completion':
         from datasets.shapenet_completion3d import ShapeNetCompletion3DDataset
         train_dataset = ShapeNetCompletion3DDataset(root_dir=config['path'], split='train', classes=config['classes'])
-        val_dataset_dict = ShapeNetCompletion3DDataset.get_validation_datasets(config['data_dir'],
-                                                                               classes=config['classes'])
-        test_dataset_dict = ShapeNetCompletion3DDataset(root_dir=config['data_dir'], split='test')
+        val_dataset_dict = ShapeNetCompletion3DDataset.get_validation_datasets(config['path'], classes=config['classes'])
+        test_dataset_dict = ShapeNetCompletion3DDataset(root_dir=config['path'], split='test')
+
+    elif dataset_name == '3depn':
+        from datasets.shapenet_3depn import ShapeNet3DEPNDataset
+        train_dataset = ShapeNet3DEPNDataset(root_dir=config['path'], split='train', classes=config['classes'])
+        val_dataset_dict = ShapeNet3DEPNDataset.get_validation_datasets(config['path'], classes=config['classes'])
+        test_dataset_dict = ShapeNet3DEPNDataset(root_dir=config['path'], split='test', classes=config['classes'])
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or `completion`. Got: `{dataset_name}`')
 

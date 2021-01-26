@@ -31,12 +31,12 @@ class HyperPlane(object):
 
 class SlicedDatasetGenerator(object):
 
-    def __init__(self, root_dir, transform=None):
+    def __init__(self, root_dir=None, transform=None):
         self.root_dir = root_dir
         self.transform = transform
 
     @staticmethod
-    def __generate_item(points, target_partition_points=1024):
+    def generate_item(points, target_partition_points=1024):
 
         while True:
             under = HyperPlane.get_random_plane().check_point(points) > 0
@@ -57,7 +57,7 @@ class SlicedDatasetGenerator(object):
             points = self.transform(points)
 
         for i in range(4):
-            real, remaining = self.__generate_item(points)
+            real, remaining = self.generate_item(points)
 
             quick_save_ply_file(real, self.root_dir + '/slices/real/' +
                                 category + '/' + str(i) + '~' + filename)

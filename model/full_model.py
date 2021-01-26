@@ -87,8 +87,9 @@ class FullModel(nn.Module):
         if noise is None and remaining.size(-1) == 3:
             remaining.transpose_(remaining.dim() - 2, remaining.dim() - 1)
 
-        if noise is None and gt.size(-1) == 3:
-            gt.transpose_(gt.dim() - 2, gt.dim() - 1)
+        if noise is None:
+            if gt.size(-1) == 3:
+                gt.transpose_(gt.dim() - 2, gt.dim() - 1)
         else:
             gt = torch.zeros([1, 3, 2048])  # TODO change gt to gt_shape
 
@@ -107,7 +108,7 @@ class FullModel(nn.Module):
         if self.training:
             return reconstruction, logvar, mu
         else:
-            return reconstruction
+            return reconstruction  # , latent, target_networks_weights
 
     params_lambdas = {
         Mode.DOUBLE_ENCODER: lambda self: chain(self.random_encoder.parameters(),

@@ -43,6 +43,9 @@ def main(config):
 
     results_dir_setup(result_dir_path, dirs_to_create)
 
+    with open(join(result_dir_path, 'last_config.json'), mode='w') as f:
+        json.dump(config, f)
+
     logging_setup(result_dir_path)
     log = logging.getLogger()
 
@@ -76,11 +79,9 @@ def main(config):
         elif run_mode == "experiments":
             latest_epoch = restore_model_state(weights_path, metrics_path, config['setup']['gpu_id'], latest_epoch,
                                                config['experiments']['epoch'], full_model)
+        log.info(f'Restored epoch : {latest_epoch}')
     elif run_mode == "experiments":
         raise FileNotFoundError("no weights found at ", weights_path)
-
-    log.info(f'Restored epoch : {latest_epoch}')
-
     # endregion Setup
 
     train_dataset, val_dataset_dict, test_dataset_dict = get_datasets(config['dataset'])
@@ -175,6 +176,10 @@ def main(config):
                     tg_log.log(log_string)
 
     elif run_mode == 'experiments':
+
+        # from datasets.real_data import RealDataNPYDataset
+        # test_dataset_dict = RealDataNPYDataset(root_dir="D:\\UJ\\bachelors\\3d-point-clouds-autocomplete\\data\\real_car_data")
+
         full_model.eval()
 
         with torch.no_grad():
