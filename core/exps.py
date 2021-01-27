@@ -107,7 +107,7 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
     from utils.evaluation.total_mutual_diff import process as tmd
     from utils.evaluation.completeness import process as uhd
     # from utils.evaluation.mmd import minimum_mathing_distance
-    '''
+
     chamfer_loss = ChamferLoss().to(device)
 
     ref_pcs = []
@@ -131,13 +131,10 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
     sample_pcs = torch.from_numpy(sample_pcs).to(device).contiguous()
     ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
 
-    
-
     for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
         print(k, v)
         res[k] = v
-    '''
-
+    
     comp, hausdorff = uhd(join(results_dir, 'fixed'))
     print('UHD', hausdorff*100)
     res['UHD'] = hausdorff * 100
