@@ -6,6 +6,8 @@ from sklearn.neighbors import NearestNeighbors
 from numpy.linalg import norm
 
 # Import CUDA version of approximate EMD, from https://github.com/zekunhao1995/pcgan-pytorch//:
+from tqdm import tqdm
+
 from utils.pytorch_structural_losses.match_cost import match_cost
 from utils.pytorch_structural_losses.nn_distance import nn_distance
 
@@ -21,6 +23,7 @@ def average_precision(query: torch.Tensor, retrieved: torch.Tensor) -> torch.Ten
     denominators = torch.arange(1, retrieved.size(1) + 1).type_as(corrects)
     return (corrects * corrects.cumsum(dim=1, dtype=corrects.dtype) / denominators).sum(dim=1) / corrects.sum(dim=1)
 
+
 def mean_average_precision(query: torch.Tensor, retrieved: torch.Tensor):
     return average_precision(query, retrieved).mean()
 
@@ -30,8 +33,10 @@ def average_precision_numpy(query, retrieved):
     denominators = np.arange(1, retrieved.shape[1] + 1)
     return ((corrects * corrects.cumsum(axis=1)) / denominators).sum(axis=1) / corrects.sum(axis=1)
 
+
 def mean_average_precision_numpy(query, retrieved):
     return np.mean(average_precision(query, retrieved))
+
 
 def earth_mover_distance(sample_pcs, ref_pcs, batch_size=None):
     """Use this function to calculate EMD in our experiments."""
@@ -116,7 +121,7 @@ def _pairwise_EMD_CD_(sample_pcs, ref_pcs, batch_size, chamfer_loss):
     all_cd = []
     all_emd = []
     iterator = range(N_sample)
-    for sample_b_start in iterator:
+    for sample_b_start in tqdm(iterator):
         sample_batch = sample_pcs[sample_b_start]
 
         cd_lst = []

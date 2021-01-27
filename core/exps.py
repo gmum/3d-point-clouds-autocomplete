@@ -1,4 +1,5 @@
 # TODO rename to experiments.py
+import glob
 from datetime import datetime
 import json
 from os.path import join
@@ -17,11 +18,11 @@ from utils.pcutil import plot_3d_point_cloud
 from utils.util import show_3d_cloud
 
 
-def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, std=0.015, noises_per_item=50,
+def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, std=0.015, noises_per_item=10,
           triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
     dataloader = DataLoader(dataset)
 
-    for i, data in enumerate(dataloader):
+    for i, data in tqdm(enumerate(dataloader), total=len(dataset)):
 
         partial, _, _, idx = data
         partial = partial.to(device)
@@ -29,7 +30,7 @@ def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, 
         from utils.util import show_3d_cloud
 
         for j in range(noises_per_item):
-            fixed_noise = torch.zeros(1, 1024).normal_(mean=mean, std=std).to(device)
+            fixed_noise = torch.zeros(1, 8).normal_(mean=mean, std=std).to(device)
 
             reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)[0]
             reconstruction = reconstruction.cpu()
@@ -44,8 +45,8 @@ def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, 
 
             # dataset.inverse_scale_to_scene(idx, reconstruction.T.numpy())
 
-            np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'),
-                    dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to real data fixed experiment
+            # np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'),
+            #        dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to real data fixed experiment
 
         partial = partial.cpu()
         fig = plot_3d_point_cloud(partial[0][0], partial[0][1], partial[0][2], in_u_sphere=True, show=False)
@@ -56,17 +57,13 @@ def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, 
 
 
 def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch, batch_size, num_workers,
-                          mean=0.0, std=0.015):
+                          mean=0.0, std=0.005):
     dataloaders_dict = {cat_name: DataLoader(cat_ds, pin_memory=True, batch_size=1, num_workers=num_workers)
                         for cat_name, cat_ds in datasets_dict.items()}
     chamfer_loss = ChamferLoss().to(device)
 
     with torch.no_grad():
         results = {}
-
-        plane_points = np.zeros((3, 3))
-        plane_points[1][2] = 1
-        plane_points[2][0] = 1
 
         for cat_name, dl in dataloaders_dict.items():
             cat_gt = []
@@ -102,6 +99,57 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
 
         with open(join(results_dir, 'evaluate_generativity', str(epoch) + 'eval_gen_by_cat.json'), mode='w') as f:
             json.dump(results, f)
+
+
+def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
+    res = {}
+
+    from utils.evaluation.total_mutual_diff import process as tmd
+    from utils.evaluation.completeness import process as uhd
+    # from utils.evaluation.mmd import minimum_mathing_distance
+    '''
+    chamfer_loss = ChamferLoss().to(device)
+
+    ref_pcs = []
+    for data in dataset:
+        _, _, gt, _ = data
+        ref_pcs.append(gt.T)
+    ref_pcs = np.stack(ref_pcs, axis=0)
+
+    pc_paths = glob.glob(join(results_dir, 'fixed', "*reconstruction.npy"))
+    pc_paths = sorted(pc_paths)
+
+    sample_pcs = []
+
+    for path in pc_paths:
+        sample_pcs.append(np.load(path).T)
+
+    sample_pcs = np.stack(sample_pcs, axis=0)
+
+    # mmd, matched_dists = minimum_mathing_distance(sample_pcs, ref_pcs, 64)
+
+    sample_pcs = torch.from_numpy(sample_pcs).to(device).contiguous()
+    ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
+
+    
+
+    for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
+        print(k, v)
+        res[k] = v
+    '''
+
+    comp, hausdorff = uhd(join(results_dir, 'fixed'))
+    print('UHD', hausdorff*100)
+    res['UHD'] = hausdorff * 100
+
+    tmd_v = tmd(join(results_dir, 'fixed'))
+
+    print('TMD', tmd_v * 100)
+    res['TMD'] = tmd_v * 100
+
+    with open(join(results_dir, 'compute_mmd_tmd_uhd', str(epoch) + 'res.json'), mode='w') as f:
+        json.dump(res, f)
+
 
 
 def merge_different_categories(full_model, device, dataset, results_dir, epoch, amount=10, first_cat='car',
@@ -379,6 +427,7 @@ experiment_functions_dict = {
     # 'different_number_of_points': different_number_of_points,
     'fixed': fixed,
     'evaluate_generativity': evaluate_generativity,
+    'compute_mmd_tmd_uhd': compute_mmd_tmd_uhd,
     'merge_different_categories': merge_different_categories,
     'same_model_different_slices': same_model_different_slices,
     "temp_exp": temp_exp
