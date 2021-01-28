@@ -78,7 +78,7 @@ class ShapeNet3DEPNDataset(BaseDataset):
             csv_reader = csv.reader(csv_file, delimiter=',')
             line_cnt = 0
             for row in csv_reader:
-                if line_cnt == 0 or (row[1] not in classes if classes else False):
+                if line_cnt == 0 or (row[1] != classes[0]):
                     pass
                 else:
                     if row[-1] == self.split:
