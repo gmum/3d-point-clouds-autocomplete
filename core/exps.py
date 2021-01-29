@@ -132,12 +132,12 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
     ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
 
     for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
-        print(k, v)
-        res[k] = v
-    
+        print(k + '* 1000', v * 1000)
+        res[k] = v.cpu().item()
+
     comp, hausdorff = uhd(join(results_dir, 'fixed'))
-    print('UHD', hausdorff*100)
-    res['UHD'] = hausdorff * 100
+    print('UHD * 100', hausdorff*100)
+    res['UHD * 100'] = hausdorff * 100
 
     tmd_v = tmd(join(results_dir, 'fixed'))
 

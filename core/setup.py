@@ -85,7 +85,7 @@ def restore_model_state(weights_path, metrics_path, gpu_id, epoch, restore_polic
         pass
     elif restore_policy == "best_val":
         val_losses = np.load(join(metrics_path, f'{epoch:05}_val.npy'), allow_pickle=True)
-        epoch = np.argmin(val_losses)
+        epoch = np.argmin(val_losses) + 1
     else:
         # TODO handle value error
         epoch = int(restore_policy)
