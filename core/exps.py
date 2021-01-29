@@ -20,19 +20,17 @@ from utils.util import show_3d_cloud
 
 def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, std=0.015, noises_per_item=10,
           triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
-    dataloader = DataLoader(dataset)
+    dataloader = DataLoader(dataset, batch_size=1)
 
     for i, data in tqdm(enumerate(dataloader), total=len(dataset)):
 
         partial, _, _, idx = data
         partial = partial.to(device)
 
-        from utils.util import show_3d_cloud
-
         for j in range(noises_per_item):
-            fixed_noise = torch.zeros(1, 8).normal_(mean=mean, std=std).to(device)
+            fixed_noise = torch.zeros(1, full_model.get_noise_size()).normal_(mean=mean, std=std).to(device)
 
-            reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)[0]
+            reconstruction = full_model(partial, None, [1, 2048, 3], epoch, device, noise=fixed_noise)[0]
             reconstruction = reconstruction.cpu()
 
             np.save(join(results_dir, 'fixed', f'{i}_{j}_fixed_noise'), np.array(fixed_noise.cpu().numpy()))
@@ -82,8 +80,8 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
                 obj_recs = []
 
                 for j in range(len(cat_gt)):
-                    fixed_noise = torch.zeros(1, 128).normal_(mean=mean, std=std).to(device)  # TODO get from model random_encoder output size
-                    reconstruction = full_model(partial, None, None, epoch, device, noise=fixed_noise)
+                    fixed_noise = torch.zeros(1, full_model.get_noise_size()).normal_(mean=mean, std=std).to(device)
+                    reconstruction = full_model(partial, None, [1, 2048, 3], epoch, device, noise=fixed_noise)
 
                     pc = reconstruction.cpu().detach().numpy()[0]
                     obj_recs.append(torch.from_numpy(pc.T[pc[1].argsort()[:1024]]).unsqueeze(0).to(device))
@@ -106,7 +104,7 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
 
     from utils.evaluation.total_mutual_diff import process as tmd
     from utils.evaluation.completeness import process as uhd
-    # from utils.evaluation.mmd import minimum_mathing_distance
+    from utils.evaluation.mmd import minimum_mathing_distance
 
     chamfer_loss = ChamferLoss().to(device)
 
@@ -126,17 +124,19 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
 
     sample_pcs = np.stack(sample_pcs, axis=0)
 
-    # mmd, matched_dists = minimum_mathing_distance(sample_pcs, ref_pcs, 64)
+    mmd, matched_dists = minimum_mathing_distance(sample_pcs, ref_pcs, 64, device)
 
-    sample_pcs = torch.from_numpy(sample_pcs).to(device).contiguous()
-    ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
+    print('MMD * 1000', mmd * 1000)
 
-    for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
-        print(k + '* 1000', v * 1000)
-        res[k] = v.cpu().item()
+    #sample_pcs = torch.from_numpy(sample_pcs).to(device).contiguous()
+    #ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
+
+    #for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
+    #    print(k + '* 1000', v * 1000)
+    #    res[k] = v.cpu().item()
 
     comp, hausdorff = uhd(join(results_dir, 'fixed'))
-    print('UHD * 100', hausdorff*100)
+    print('UHD * 100', hausdorff * 100)
     res['UHD * 100'] = hausdorff * 100
 
     tmd_v = tmd(join(results_dir, 'fixed'))
@@ -146,7 +146,6 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
 
     with open(join(results_dir, 'compute_mmd_tmd_uhd', str(epoch) + 'res.json'), mode='w') as f:
         json.dump(res, f)
-
 
 
 def merge_different_categories(full_model, device, dataset, results_dir, epoch, amount=10, first_cat='car',
@@ -183,7 +182,7 @@ def merge_different_categories(full_model, device, dataset, results_dir, epoch, 
             f_partial = torch.from_numpy(f_partial).unsqueeze(0).to(device)
             s_partial = torch.from_numpy(s_partial).unsqueeze(0).to(device)
 
-            gt = torch.from_numpy(f_gt).unsqueeze(0).to(device)  # TODO after changing gt to gt_shape in forward method
+            gt_shape = list(torch.from_numpy(f_gt).unsqueeze(0).shape)
 
             for j in range(amount):
                 _, temp_f_remaining, temp_f_gt, _ = first_cat_dataset[first_cat_ids[j]]
@@ -195,19 +194,19 @@ def merge_different_categories(full_model, device, dataset, results_dir, epoch, 
                 temp_f_remaining = torch.from_numpy(temp_f_remaining).unsqueeze(0).to(device)
                 temp_s_remaining = torch.from_numpy(temp_s_remaining).unsqueeze(0).to(device)
 
-                rec_ff = full_model(f_partial, temp_f_remaining, gt, epoch, device)
+                rec_ff = full_model(f_partial, temp_f_remaining, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}~{first_cat}_{j}_rec'),
                         rec_ff.cpu().numpy()[0].T)
 
-                rec_fs = full_model(f_partial, temp_s_remaining, gt, epoch, device)
+                rec_fs = full_model(f_partial, temp_s_remaining, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}~{second_cat}_{j}_rec'),
                         rec_fs.cpu().numpy()[0].T)
 
-                rec_sf = full_model(s_partial, temp_f_remaining, gt, epoch, device)
+                rec_sf = full_model(s_partial, temp_f_remaining, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}~{first_cat}_{j}_rec'),
                         rec_sf.cpu().numpy()[0].T)
 
-                rec_ss = full_model(s_partial, temp_f_remaining, gt, epoch, device)
+                rec_ss = full_model(s_partial, temp_f_remaining, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}~{second_cat}_{j}_rec'),
                         rec_ss.cpu().numpy()[0].T)
 
@@ -216,12 +215,12 @@ def same_model_different_slices(full_model, device, datasets_dict, results_dir, 
                                 mean=0.0, std=0.015):
     def process_partial(pcd, cat_name, name, i, j):
         np.save(join(results_dir, 'same_model_different_slices', f'{cat_name}_{i}_{j}_{name}_pcd'), pcd)
-        noise = torch.zeros(1, 1024).normal_(mean=mean, std=std)
+        noise = torch.zeros(1, full_model.get_noise_size()).normal_(mean=mean, std=std)
         np.save(join(results_dir, 'same_model_different_slices', f'{cat_name}_{i}_{j}_{name}_noise'), noise.numpy())
 
         pcd = torch.from_numpy(pcd).unsqueeze(0).to(device)
         noise = noise.to(device)
-        rec = full_model(pcd, None, None, epoch, device, noise=noise)[0].cpu().numpy()
+        rec = full_model(pcd, None, [1, 2048, 3], epoch, device, noise=noise)[0].cpu().numpy()
 
         np.save(join(results_dir, 'same_model_different_slices', f'{cat_name}_{i}_{j}_{name}_rec'), rec)
 
@@ -318,7 +317,7 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
                     partial = partial.to(device)
                     remaining = remaining.to(device)
 
-                    rec, latent, tnw = full_model(partial, remaining, gt, epoch, device)
+                    rec, latent, tnw = full_model(partial, remaining, list(gt.shape), epoch, device)
 
                     cat_latent.append(latent.detach().cpu())
                     cat_tnw.append(tnw.detach().cpu())
@@ -360,17 +359,17 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
                 partial_y = gt[gt.T[1].argsort()[1024:]]
                 remaining_y = gt[gt.T[1].argsort()[:1024]]
 
-                gt = torch.from_numpy(gt).unsqueeze(0)
+                gt_shape = list(torch.from_numpy(gt).unsqueeze(0).shape)
 
                 partial = torch.from_numpy(partial_x).unsqueeze(0).to(device)
                 remaining = torch.from_numpy(remaining_x).unsqueeze(0).to(device)
-                _, latent, tnw = full_model(partial, remaining, gt, epoch, device)
+                _, latent, tnw = full_model(partial, remaining, gt_shape, epoch, device)
                 cat_latent.append(latent.cpu())
                 cat_tnw.append(tnw.cpu())
 
                 partial = torch.from_numpy(partial_y).unsqueeze(0).to(device)
                 remaining = torch.from_numpy(remaining_y).unsqueeze(0).to(device)
-                _, latent, tnw = full_model(partial, remaining, gt, epoch, device)
+                _, latent, tnw = full_model(partial, remaining, gt_shape, epoch, device)
                 cat_latent.append(latent.cpu())
                 cat_tnw.append(tnw.cpu())
 

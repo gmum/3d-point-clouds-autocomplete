@@ -1,6 +1,6 @@
-import sys
-sys.path.append("..")
-import tensorflow as tf
+# import sys
+# sys.path.append("..")
+# import tensorflow as tf
 import argparse
 import os
 import numpy as np
@@ -166,11 +166,11 @@ def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=Tr
         use_EMD (boolean): If true, the matchings are based on the EMD.
     '''
     if normalize:
-        # reducer = tf.reduce_mean
-        reducer = torch.mean
+        reducer = tf.reduce_mean
+        # reducer = torch.mean
     else:
-        # reducer = tf.reduce_sum
-        reducer = torch.sum
+        reducer = tf.reduce_sum
+        # reducer = torch.sum
 
     # if sess is None:
     #    config = tf.ConfigProto()
@@ -179,8 +179,8 @@ def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=Tr
 
     # Placeholders for the point-clouds: 1 for the reference (usually Ground-truth) and one of variable size for the collection
     # which is going to be matched with the reference.
-    # ref_pl = tf.placeholder(tf.float32, shape=(1, n_pc_points, 3))
-    # sample_pl = tf.placeholder(tf.float32, shape=(batch_size, n_pc_points, 3))
+    ref_pl = tf.placeholder(tf.float32, shape=(1, n_pc_points, 3))
+    sample_pl = tf.placeholder(tf.float32, shape=(batch_size, n_pc_points, 3))
 
     # if batch_size is None:
     #     batch_size = tf.shape(sample_pl)[0]
@@ -189,15 +189,15 @@ def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=Tr
     ref_repeat = tf.reshape(ref_repeat, [batch_size, n_pc_points, 3])
 
     if use_EMD:
-        match = approx_match(ref_repeat, sample_pl)
-        all_dist_in_batch = match_cost(ref_repeat, sample_pl, match)
-        if normalize:
-            all_dist_in_batch /= n_pc_points
+        # match = approx_match(ref_repeat, sample_pl)
+        # all_dist_in_batch = match_cost(ref_repeat, sample_pl, match)
+        #if normalize:
+        #    all_dist_in_batch /= n_pc_points
+        pass
     else:
+        ref_to_s, _, s_to_ref, _ = nn_distance(ref_repeat, sample_pl)
 
-        # ref_to_s, _, s_to_ref, _ = nn_distance(ref_repeat, sample_pl)
-
-        ref_to_s, s_to_ref = nn_distance(ref_repeat, sample_pl)
+        # ref_to_s, s_to_ref = nn_distance(ref_repeat, sample_pl)
 
         if use_sqrt:
             ref_to_s = tf.sqrt(ref_to_s)
@@ -209,7 +209,7 @@ def minimum_mathing_distance_tf_graph(n_pc_points, batch_size=None, normalize=Tr
     return ref_pl, sample_pl, best_in_batch, location_of_best, sess
 
 
-def minimum_mathing_distance(sample_pcs, ref_pcs, batch_size, normalize=True, sess=None, verbose=False, use_sqrt=False, use_EMD=False):
+def minimum_mathing_distance(sample_pcs, ref_pcs, batch_size, device=None, normalize=True, sess=None, verbose=False, use_sqrt=False, use_EMD=False):
     '''Computes the MMD between two sets of point-clouds.
     Args:
         sample_pcs (numpy array SxKx3): the S point-clouds, each of K points that will be matched and
@@ -235,19 +235,26 @@ def minimum_mathing_distance(sample_pcs, ref_pcs, batch_size, normalize=True, se
     if n_pc_points != n_pc_points_s or pc_dim != pc_dim_s:
         raise ValueError('Incompatible size of point-clouds.')
 
-    ref_pl, sample_pl, best_in_batch, _, sess = minimum_mathing_distance_tf_graph(n_pc_points, normalize=normalize,
-                                                                                  sess=sess, use_sqrt=use_sqrt,
-                                                                                  use_EMD=use_EMD)
+    # ref_pl, sample_pl, best_in_batch, _, sess = minimum_mathing_distance_tf_graph() #n_pc_points, normalize=normalize,
+    #                                                                              sess=sess, use_sqrt=use_sqrt,
+    #                                                                             use_EMD=use_EMD)
     matched_dists = []
     pbar = tqdm(range(n_ref))
     for i in pbar:
         best_in_all_batches = []
+        ref = torch.from_numpy(ref_pcs[i]).unsqueeze(0).to(device).contiguous()
         for sample_chunk in iterate_in_chunks(sample_pcs, batch_size):
-            feed_dict = {ref_pl: np.expand_dims(ref_pcs[i], 0), sample_pl: sample_chunk}
-            b = sess.run(best_in_batch, feed_dict=feed_dict)
-            best_in_all_batches.append(b)
-        matched_dists.append(np.min(best_in_all_batches))
+            chunk = torch.from_numpy(sample_chunk).to(device).contiguous()
+            ref_to_s, s_to_ref = nn_distance(ref, chunk)
+            all_dist_in_batch = ref_to_s.mean(dim=1) + s_to_ref.mean(dim=1)
+            best_in_batch = torch.min(all_dist_in_batch).item()
+            best_in_all_batches.append(best_in_batch)
 
+            # feed_dict = {ref_pl: np.expand_dims(ref_pcs[i], 0), sample_pl: sample_chunk}
+            # b = sess.run(best_in_batch, feed_dict=feed_dict)
+            # best_in_all_batches.append(b)
+
+        matched_dists.append(np.min(best_in_all_batches))
         pbar.set_postfix({"mmd": np.mean(matched_dists)})
 
     mmd = np.mean(matched_dists)

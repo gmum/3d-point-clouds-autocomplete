@@ -27,7 +27,11 @@ class FullModel(nn.Module):
         config['hyper_network']['target_network_freeze_layers_learning'] = config['target_network'][
             'freeze_layers_learning']
 
+    def get_noise_size(self):
+        return self.random_encoder_output_size
+
     def _resolve_mode(self, config):
+        self.random_encoder_output_size = config['random_encoder']['output_size']
         if config['random_encoder']['output_size'] > 0 and config['real_encoder']['output_size'] > 0:
             self.model_mode = FullModel.Mode.DOUBLE_ENCODER
             self.random_encoder = Encoder(config['random_encoder'], is_vae=True)
@@ -79,7 +83,7 @@ class FullModel(nn.Module):
         elif self.model_mode == FullModel.Mode.REAL_ENCODER:
             return self.real_encoder(partial), None, None
 
-    def forward(self, partial, remaining, gt, epoch, device, noise=None):
+    def forward(self, partial, remaining, gt_shape, epoch, device, noise=None):
 
         if partial.size(-1) == 3:
             partial.transpose_(partial.dim() - 2, partial.dim() - 1)
@@ -87,22 +91,19 @@ class FullModel(nn.Module):
         if noise is None and remaining.size(-1) == 3:
             remaining.transpose_(remaining.dim() - 2, remaining.dim() - 1)
 
-        if noise is None:
-            if gt.size(-1) == 3:
-                gt.transpose_(gt.dim() - 2, gt.dim() - 1)
-        else:
-            gt = torch.zeros([1, 3, 2048])  # TODO change gt to gt_shape
+        if gt_shape[-1] == 3:
+            gt_shape[1], gt_shape[2] = gt_shape[2], gt_shape[1]
 
         latent, mu, logvar = self._get_latent(partial, remaining, noise)
 
         target_networks_weights = self.hyper_network(latent)
-        reconstruction = torch.zeros(gt.shape).to(device)
+        reconstruction = torch.zeros(gt_shape).to(device)
 
         for j, target_network_weights in enumerate(target_networks_weights):
             target_network = TargetNetwork(self.target_network_config, target_network_weights).to(device)
 
             target_network_input = generate_points(config=self.point_generator_config, epoch=epoch,
-                                                   size=(gt.shape[2], gt.shape[1]))
+                                                   size=(gt_shape[2], gt_shape[1]))
             reconstruction[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
         if self.training:

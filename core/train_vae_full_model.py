@@ -146,7 +146,7 @@ def main(config):
             remaining = remaining.to(device)
             gt = gt.to(device)
 
-            reconstruction, logvar, mu = full_model(partial, remaining, gt, epoch, device)
+            reconstruction, logvar, mu = full_model(partial, remaining, gt.shape, epoch, device)
 
             loss_r = torch.mean(
                 config['reconstruction_coef'] *
