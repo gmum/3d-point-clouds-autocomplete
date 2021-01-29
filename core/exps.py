@@ -13,12 +13,13 @@ from torch.utils.data import DataLoader
 
 from datasets.utils.dataset_generator import SlicedDatasetGenerator
 from losses.champfer_loss import ChamferLoss
+from model.full_model import FullModel
 from utils.metrics import compute_all_metrics, jsd_between_point_cloud_sets
 from utils.pcutil import plot_3d_point_cloud
 from utils.util import show_3d_cloud
 
 
-def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, std=0.015, noises_per_item=10,
+def fixed(full_model: FullModel, device, dataset, results_dir: str, epoch, amount=30, mean=0.0, std=0.015, noises_per_item=10,
           triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
     dataloader = DataLoader(dataset, batch_size=1)
 
@@ -54,12 +55,11 @@ def fixed(full_model, device, dataset, results_dir, epoch, amount=30, mean=0.0, 
         np.save(join(results_dir, 'fixed', f'{i}_partial'), np.array(partial.cpu().numpy()))
 
 
-def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch, batch_size, num_workers,
+def evaluate_generativity(full_model: FullModel, device, datasets_dict, results_dir, epoch, batch_size, num_workers,
                           mean=0.0, std=0.005):
     dataloaders_dict = {cat_name: DataLoader(cat_ds, pin_memory=True, batch_size=1, num_workers=num_workers)
                         for cat_name, cat_ds in datasets_dict.items()}
     chamfer_loss = ChamferLoss().to(device)
-
     with torch.no_grad():
         results = {}
 
@@ -99,7 +99,7 @@ def evaluate_generativity(full_model, device, datasets_dict, results_dir, epoch,
             json.dump(results, f)
 
 
-def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
+def compute_mmd_tmd_uhd(full_model: FullModel, device, dataset, results_dir, epoch):
     res = {}
 
     from utils.evaluation.total_mutual_diff import process as tmd
@@ -139,8 +139,8 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
     res['UHD * 100'] = hausdorff * 100
 
     tmd_v = tmd(join(results_dir, 'fixed'))
-    print('TMD', tmd_v * 100)
-    res['TMD'] = tmd_v * 100
+    print('TMD * 100', tmd_v * 100)
+    res['TMD * 100'] = tmd_v * 100
 
     with open(join(results_dir, 'compute_mmd_tmd_uhd', str(epoch) + 'res.json'), mode='w') as f:
         json.dump(res, f)

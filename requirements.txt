@@ -1,3 +1,4 @@
+trimesh
 h5py==3.1.0
 pandas==1.1.4
 torch==1.7.0

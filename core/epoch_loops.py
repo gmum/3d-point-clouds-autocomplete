@@ -23,7 +23,7 @@ def train_epoch(epoch, full_model, optimizer, loader, device, rec_loss_function,
         reconstruction, logvar, mu = full_model(partial, remaining, list(gt.shape), epoch, device)
 
         loss_r = torch.mean(
-            loss_coef * rec_loss_function(gt, reconstruction.permute(0, 2, 1)))
+            loss_coef * rec_loss_function(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1)))
 
         if full_model.model_mode in [FullModel.Mode.DOUBLE_ENCODER, FullModel.Mode.RANDOM_ENCODER]:
             loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
@@ -64,7 +64,7 @@ def val_epoch(epoch, full_model, device, loaders_dict, val_classes_names, loss_f
                 reconstruction = full_model(partial, remaining, list(gt.shape), epoch, device)
 
                 loss_our_cd = torch.mean(
-                    loss_coef * loss_function(gt, reconstruction.permute(0, 2, 1)))
+                    loss_coef * loss_function(gt.permute(0, 2, 1), reconstruction.permute(0, 2, 1)))
 
                 loss += loss_our_cd.item()
 

@@ -88,14 +88,10 @@ def main(config):
 
     # div_left_right_bin_search(dataset_dir, plane_points, not_existed_pc)
 
-
-
     not_1024 = []
     for pc_path in pc_paths:
         if load_ply(join(dataset_dir, 'test_gen', 'left', pc_path)).shape[0] != 1024:
             not_1024.append(pc_path)
-
-
 
 
 if __name__ == '__main__':

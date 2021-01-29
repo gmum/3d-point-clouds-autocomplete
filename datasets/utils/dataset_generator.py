@@ -57,12 +57,11 @@ class SlicedDatasetGenerator(object):
             points = self.transform(points)
 
         for i in range(4):
-            real, remaining = self.generate_item(points)
-
-            quick_save_ply_file(real, self.root_dir + '/slices/real/' +
-                                category + '/' + str(i) + '~' + filename)
-            quick_save_ply_file(remaining, self.root_dir + '/slices/remaining/' +
-                                category + '/' + str(i) + '~' + filename)
+            partial, remaining = self.generate_item(points)
+            quick_save_ply_file(partial, join(self.root_dir, 'slices', 'real', category,
+                                              str(i) + '~' + filename))
+            quick_save_ply_file(remaining, join(self.root_dir, 'slices', 'remaining', category,
+                                                str(i) + '~' + filename))
 
     def generate(self, pc_df_iter):
         ray.init(num_cpus=os.cpu_count())

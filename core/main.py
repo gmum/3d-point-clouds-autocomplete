@@ -23,12 +23,12 @@ from utils.telegram_logging import TelegramLogger
 from utils.util import find_latest_epoch, save_plot, get_model_name, show_3d_cloud
 
 
-def main(config):
+def main(config: dict):
     # region Setup
     seed_setup(config['setup']['seed'])
 
-    run_mode = config['mode']
-    result_dir_path = get_results_dir_path(config, run_mode)
+    run_mode: str = config['mode']
+    result_dir_path: str = get_results_dir_path(config, run_mode)
 
     if run_mode == 'training':
         dirs_to_create = ('weights', 'samples', 'metrics')

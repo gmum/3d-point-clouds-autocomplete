@@ -9,6 +9,7 @@ from os.path import join, exists
 
 from datasets.base_dataset import BaseDataset
 from datasets.utils.shapenet_category_mapping import synth_id_to_category
+from utils.util import show_3d_cloud
 
 
 def downsample_point_cloud(points, n_pts):

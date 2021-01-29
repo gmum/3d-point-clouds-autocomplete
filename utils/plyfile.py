@@ -941,7 +941,7 @@ def load_ply(file_name: str,
     return ret_val
 
 
-def quick_save_ply_file(points, filename):
+def quick_save_ply_file(points, filename: str):
     pl = len(points)
     header = \
         "ply\n" \
