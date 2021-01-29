@@ -125,22 +125,20 @@ def compute_mmd_tmd_uhd(full_model, device, dataset, results_dir, epoch):
     sample_pcs = np.stack(sample_pcs, axis=0)
 
     mmd, matched_dists = minimum_mathing_distance(sample_pcs, ref_pcs, 64, device)
-
     print('MMD * 1000', mmd * 1000)
+    res['MMD * 1000'] = mmd * 1000
 
-    #sample_pcs = torch.from_numpy(sample_pcs).to(device).contiguous()
-    #ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
-
-    #for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
-    #    print(k + '* 1000', v * 1000)
-    #    res[k] = v.cpu().item()
+    # sample_pcs = torch.from_numpy(sample_pcs).to(device).contiguous()
+    # ref_pcs = torch.from_numpy(ref_pcs).to(device).contiguous()
+    # for k, v in compute_all_metrics(sample_pcs, ref_pcs, 64, chamfer_loss).items():
+    #     print(k + '* 1000', v * 1000)
+    #     res[k] = v.cpu().item()
 
     comp, hausdorff = uhd(join(results_dir, 'fixed'))
     print('UHD * 100', hausdorff * 100)
     res['UHD * 100'] = hausdorff * 100
 
     tmd_v = tmd(join(results_dir, 'fixed'))
-
     print('TMD', tmd_v * 100)
     res['TMD'] = tmd_v * 100
 
