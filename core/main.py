@@ -122,7 +122,7 @@ def main(config: dict):
             for k in range(min(5, latest_rec.shape[0])):
                 train_plots.append(save_plot(latest_partial[k], epoch, k, samples_path, 'partial'))
                 train_plots.append(save_plot(latest_rec[k], epoch, k, samples_path, 'reconstructed'))
-                train_plots.append(save_plot(latest_gt[k], epoch, k, samples_path, 'gt'))
+                train_plots.append(save_plot(latest_gt[k].T, epoch, k, samples_path, 'gt'))
 
             if config['telegram_logger']['enable']:
                 tg_log.log_images(train_plots[:9], log_string)
@@ -150,8 +150,8 @@ def main(config: dict):
             val_plots = []
             for cat_name, sample in epoch_val_samples.items():
                 val_plots.append(save_plot(sample[0], epoch, cat_name, samples_path, 'val_partial'))
-                val_plots.append(save_plot(sample[1], epoch, cat_name, samples_path, 'val_gt'))
                 val_plots.append(save_plot(sample[2], epoch, cat_name, samples_path, 'val_rec'))
+                val_plots.append(save_plot(sample[1].T, epoch, cat_name, samples_path, 'val_gt'))
 
             if config['telegram_logger']['enable']:
                 chosen_plot_idx = np.random.choice(np.arange(len(val_plots) / 3, dtype=np.int),

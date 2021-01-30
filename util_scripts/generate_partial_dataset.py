@@ -71,6 +71,7 @@ def main(config: dict):
             os.makedirs(join(dataset_path, 'slices', 'gt', cat), exist_ok=True)
 
         print('pc to process: ', np.sum([len(v) for v in refined_shape_names.values()]))
+        print('pc to process: ', {k: len(v) for k, v in refined_shape_names.items()})
 
         ray.init(num_cpus=os.cpu_count())
 
