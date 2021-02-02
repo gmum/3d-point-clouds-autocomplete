@@ -1,5 +1,7 @@
 # TODO rename to experiments.py
 import glob
+import os
+import shutil
 from datetime import datetime
 import json
 from os.path import join
@@ -22,15 +24,19 @@ from utils.util import show_3d_cloud
 def fixed(full_model: FullModel, device, dataset, results_dir: str, epoch, amount=30, mean=0.0, std=0.015,
           noises_per_item=10, batch_size=8,
           triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
-    dataloader = DataLoader(dataset, batch_size=batch_size)
 
+    # clean dir
+    shutil.rmtree(join(results_dir, 'fixed'), ignore_errors=True)
+    os.makedirs(join(results_dir, 'fixed'), exist_ok=True)
+
+    dataloader = DataLoader(dataset, batch_size=batch_size)
     for i, data in tqdm(enumerate(dataloader), total=len(dataloader)):
 
         partial, _, _, idx = data
 
-        from scipy.spatial.transform import Rotation
-        for k in range(partial.shape[0]):
-            partial[k] = partial[k] @ Rotation.from_euler('y', 90, degrees=True).as_matrix().astype(np.float32) @ Rotation.from_euler('x', 270, degrees=True).as_matrix().astype(np.float32)
+        # from scipy.spatial.transform import Rotation
+        #for k in range(partial.shape[0]):
+        #    partial[k] = partial[k] @ Rotation.from_euler('y', 90, degrees=True).as_matrix().astype(np.float32) @ Rotation.from_euler('x', 270, degrees=True).as_matrix().astype(np.float32)
 
         partial = partial.to(device)
 
@@ -39,7 +45,7 @@ def fixed(full_model: FullModel, device, dataset, results_dir: str, epoch, amoun
 
             reconstruction = full_model(partial, None, [partial.shape[0], 2048, 3], epoch, device, noise=fixed_noise).cpu()
             for k in range(reconstruction.shape[0]):
-                reconstruction[k] = (reconstruction[k].T  @ Rotation.from_euler('x', -270, degrees=True).as_matrix().astype(np.float32) @ Rotation.from_euler('y', -90, degrees=True).as_matrix().astype(np.float32)).T
+                # reconstruction[k] = (reconstruction[k].T  @ Rotation.from_euler('x', -270, degrees=True).as_matrix().astype(np.float32) @ Rotation.from_euler('y', -90, degrees=True).as_matrix().astype(np.float32)).T
                 np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_{j}_reconstruction'), reconstruction[k].numpy())
                 #np.save(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_noise'), np.array(fixed_noise[k].cpu().numpy()))
                 #fig = plot_3d_point_cloud(reconstruction[k][0], reconstruction[k][1], reconstruction[k][2], in_u_sphere=True, show=False)
