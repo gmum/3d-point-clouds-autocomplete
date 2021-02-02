@@ -26,12 +26,8 @@ def get_datasets(config):
         test_dataset_dict = ShapeNetCompletion3DDataset(root_dir=config['path'], split='test')
 
     elif dataset_name == '3depn':
-        train_dataset = ShapeNetDataset(root_dir=config['path']+'/../shapenet', classes=config['classes'], split='train',
-                                        num_samples=4, use_list_with_name='msc')
-        val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['path']+'/../shapenet', classes=config['classes'],
-                                                                   num_samples=4, use_list_with_name='msc')
-        #train_dataset = ShapeNet3DEPNDataset(root_dir=config['path'], split='train', classes=config['classes'])
-        #val_dataset_dict = ShapeNet3DEPNDataset.get_validation_datasets(config['path'], classes=config['classes'])
+        train_dataset = ShapeNet3DEPNDataset(root_dir=config['path'], split='train', classes=config['classes'])
+        val_dataset_dict = ShapeNet3DEPNDataset.get_validation_datasets(config['path'], classes=config['classes'])
         test_dataset_dict = ShapeNet3DEPNDataset(root_dir=config['path'], split='test', classes=config['classes'])
     else:
         raise ValueError(f'Invalid dataset name. Expected `shapenet` or `completion`. Got: `{dataset_name}`')
