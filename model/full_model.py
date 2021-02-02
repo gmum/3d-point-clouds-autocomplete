@@ -13,12 +13,9 @@ from utils.points import generate_points
 
 
 class FullModel(nn.Module):
-    class Mode(Enum):
-        DOUBLE_ENCODER = 1
-        RANDOM_ENCODER = 2
-        REAL_ENCODER = 3
 
-    def _complete_config(self, config):
+    @staticmethod
+    def _complete_config(config):
         config['hyper_network']['target_network_layer_out_channels'] = config['target_network']['layer_out_channels']
         config['hyper_network']['target_network_use_bias'] = config['target_network']['use_bias']
         config['hyper_network']['input_size'] = config['random_encoder']['output_size'] + \
@@ -33,14 +30,14 @@ class FullModel(nn.Module):
     def _resolve_mode(self, config):
         self.random_encoder_output_size = config['random_encoder']['output_size']
         if config['random_encoder']['output_size'] > 0 and config['real_encoder']['output_size'] > 0:
-            self.model_mode = FullModel.Mode.DOUBLE_ENCODER
+            self.mode = HyperPocket()
             self.random_encoder = Encoder(config['random_encoder'], is_vae=True)
             self.real_encoder = Encoder(config['real_encoder'], is_vae=False)
         elif config['random_encoder']['output_size'] > 0:
-            self.model_mode = FullModel.Mode.RANDOM_ENCODER
+            self.mode = HyperCloud()
             self.random_encoder = Encoder(config['random_encoder'], is_vae=True)
         elif config['real_encoder']['output_size'] > 0:
-            self.model_mode = FullModel.Mode.REAL_ENCODER
+            self.mode = HyperRec()
             self.real_encoder = Encoder(config['real_encoder'], is_vae=False)
         else:
             raise ValueError("at least one encoder should have non zero output")
@@ -55,34 +52,6 @@ class FullModel(nn.Module):
 
         self.point_generator_config = {'target_network_input': config['target_network_input']}
 
-    def _get_latent(self, partial, remaining, noise=None):
-        # TODO think about refactor (extract to he new class ModelStrategy)
-        if self.model_mode == FullModel.Mode.DOUBLE_ENCODER:
-            if self.training:
-                codes, mu, logvar = self.random_encoder(remaining)
-                real_mu = self.real_encoder(partial)
-                latent = torch.cat([codes, real_mu], 1)
-                return latent, mu, logvar
-            else:
-                if noise is None:
-                    _, random_mu, _ = self.random_encoder(remaining)
-                else:
-                    random_mu = noise
-                real_mu = self.real_encoder(partial)
-                latent = torch.cat([random_mu, real_mu], 1)
-                return latent, None, None
-        elif self.model_mode == FullModel.Mode.RANDOM_ENCODER:
-            if self.training:
-                return self.random_encoder(partial)
-            else:
-                if noise is None:
-                    _, random_mu, _ = self.random_encoder(partial)
-                else:
-                    random_mu = noise
-                return random_mu, None, None
-        elif self.model_mode == FullModel.Mode.REAL_ENCODER:
-            return self.real_encoder(partial), None, None
-
     def forward(self, partial, remaining, gt_shape, epoch, device, noise=None):
 
         if partial.size(-1) == 3:
@@ -94,32 +63,91 @@ class FullModel(nn.Module):
         if gt_shape[-1] == 3:
             gt_shape[1], gt_shape[2] = gt_shape[2], gt_shape[1]
 
-        latent, mu, logvar = self._get_latent(partial, remaining, noise)
+        latent, mu, logvar = self.mode.get_latent(self, partial, remaining, noise)
 
         target_networks_weights = self.hyper_network(latent)
         reconstruction = torch.zeros(gt_shape).to(device)
 
         for j, target_network_weights in enumerate(target_networks_weights):
             target_network = TargetNetwork(self.target_network_config, target_network_weights).to(device)
-
             target_network_input = generate_points(config=self.point_generator_config, epoch=epoch,
                                                    size=(gt_shape[2], gt_shape[1]))
             reconstruction[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
+        # reconstruction shape [BATCH_SIZE, 3, N]
         if self.training:
             return reconstruction, logvar, mu
         else:
             return reconstruction  # , latent, target_networks_weights
 
-    params_lambdas = {
-        Mode.DOUBLE_ENCODER: lambda self: chain(self.random_encoder.parameters(),
-                                                self.real_encoder.parameters(),
-                                                self.hyper_network.parameters()),
-        Mode.RANDOM_ENCODER: lambda self: chain(self.random_encoder.parameters(),
-                                                self.hyper_network.parameters()),
-        Mode.REAL_ENCODER: lambda self: chain(self.real_encoder.parameters(),
-                                              self.hyper_network.parameters()),
-    }
-
     def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
-        return self.params_lambdas[self.model_mode](self)
+        return self.mode.get_parameters(self)
+
+
+class ModelMode(object):
+
+    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+        raise NotImplementedError
+
+    def get_parameters(self, model: FullModel) -> Iterator[Parameter]:
+        raise NotImplementedError
+
+    def has_generativity(self) -> bool:
+        raise NotImplementedError
+
+
+class HyperPocket(ModelMode):
+
+    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+        if model.training:
+            codes, mu, logvar = model.random_encoder(remaining)
+            real_mu = model.real_encoder(partial)
+            latent = torch.cat([codes, real_mu], 1)
+            return latent, mu, logvar
+        else:
+            if noise is None:
+                _, random_mu, _ = model.random_encoder(remaining)
+            else:
+                random_mu = noise
+            real_mu = model.real_encoder(partial)
+            latent = torch.cat([random_mu, real_mu], 1)
+            return latent, None, None
+
+    def get_parameters(self, model: FullModel):
+        return chain(model.random_encoder.parameters(),
+                     model.real_encoder.parameters(),
+                     model.hyper_network.parameters())
+
+    def has_generativity(self) -> bool:
+        return True
+
+
+class HyperRec(ModelMode):
+
+    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+        return model.real_encoder(partial), None, None
+
+    def get_parameters(self, model: FullModel):
+        return chain(model.real_encoder.parameters(), model.hyper_network.parameters())
+
+    def has_generativity(self) -> bool:
+        return False
+
+
+class HyperCloud(ModelMode):
+
+    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+        if model.training:
+            return model.random_encoder(partial)
+        else:
+            if noise is None:
+                _, random_mu, _ = model.random_encoder(partial)
+            else:
+                random_mu = noise
+            return random_mu, None, None
+
+    def get_parameters(self, model: FullModel):
+        return chain(model.random_encoder.parameters(), model.hyper_network.parameters())
+
+    def has_generativity(self) -> bool:
+        return False

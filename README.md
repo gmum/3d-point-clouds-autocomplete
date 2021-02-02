@@ -7,7 +7,7 @@
 
 
 Create and activate your conda env:
-- run `conda create --name <your env name> python=3.6`
+- run `conda create --name <your env name> python=3.7`
 - run `conda activate <your env name>`
 
 Install requirements:

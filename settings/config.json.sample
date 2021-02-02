@@ -105,7 +105,6 @@
     },
     "setup": {
         "seed": 2020,
-        "cuda": true,
         "gpu_id": 0
     },
     "telegram_logger": {

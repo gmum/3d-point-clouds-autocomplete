@@ -55,7 +55,7 @@ def logging_setup(log_dir):
     logging.getLogger('').addHandler(console)
 
 
-def cuda_setup(cuda=False, gpu_idx=0):
+def cuda_setup(gpu_idx=0):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(gpu_idx)
     return device
@@ -87,9 +87,10 @@ def restore_model_state(weights_path, metrics_path, gpu_id, epoch, restore_polic
         val_losses = np.load(join(metrics_path, f'{epoch:05}_val.npy'), allow_pickle=True)
         epoch = np.argmin(val_losses) + 1
     else:
-        # TODO handle value error
-        epoch = int(restore_policy)
-    # full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth')))
+        try:
+            epoch = int(restore_policy)
+        except ValueError:
+            raise ValueError('`[epoch]` value can take only values: `latest`, `best_val` or positive integer')
 
     full_model.load_state_dict(torch.load(join(weights_path, f'{epoch:05}_model.pth'),
                                           map_location='cuda:' + str(gpu_id)))

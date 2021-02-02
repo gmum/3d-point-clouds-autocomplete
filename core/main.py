@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from core.arg_parser import parse_config
 from core.epoch_loops import train_epoch, val_epoch
-from core.exps import experiment_functions_dict
+from core.experiments import experiment_functions_dict
 from datasets import get_datasets
 from model.full_model import FullModel
 from losses.champfer_loss import ChamferLoss
@@ -20,7 +20,7 @@ from core.setup import seed_setup, logging_setup, cuda_setup, results_dir_setup,
     get_results_dir_path, restore_metrics, weights_init
 from utils.telegram_logging import TelegramLogger
 
-from utils.util import find_latest_epoch, save_plot, get_model_name, show_3d_cloud
+from utils.util import find_latest_epoch, save_plot, get_model_name
 
 
 def main(config: dict):
@@ -54,7 +54,7 @@ def main(config: dict):
     if config['telegram_logger']['enable']:
         tg_log = TelegramLogger.getLogger(config['telegram_logger'])
 
-    device = cuda_setup(config['setup']['cuda'], config['setup']['gpu_id'])
+    device = cuda_setup(config['setup']['gpu_id'])
     log.info(f'Device variable: {device}')
 
     reconstruction_loss = ChamferLoss().to(device)
@@ -167,7 +167,7 @@ def main(config: dict):
                 torch.save(optimizer.state_dict(), join(weights_path, f'{epoch:05}_O.pth'))
                 torch.save(scheduler.state_dict(), join(weights_path, f'{epoch:05}_S.pth'))
 
-                np.save(join(metrics_path, f'{epoch:05}_train'), np.array(train_losses))  # TODO add epoch id to the array
+                np.save(join(metrics_path, f'{epoch:05}_train'), np.array(train_losses))
                 np.save(join(metrics_path, f'{epoch:05}_val'), np.array(val_losses))
 
                 log_string = "Epoch: %s saved" % epoch

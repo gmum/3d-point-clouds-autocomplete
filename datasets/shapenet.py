@@ -16,8 +16,8 @@ from utils.util import resample_pcd
 
 class ShapeNetDataset(BaseDataset):
 
-    def __init__(self, root_dir='/home/datasets/shapenet',  split='train', classes=[],
-                 is_random_rotated=False, num_samples=4, use_pcn_model_list=False, is_gen=False):
+    def __init__(self, root_dir='/home/datasets/shapenet', split='train', classes=[],
+                 is_random_rotated=False, num_samples=4, use_list_with_name='pcn', is_gen=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
@@ -25,20 +25,21 @@ class ShapeNetDataset(BaseDataset):
         super().__init__(root_dir, split, classes)
 
         self.is_random_rotated = is_random_rotated
-        self.use_pcn_model_list = use_pcn_model_list
+        self.use_list_with_name = use_list_with_name
         self.num_samples = num_samples
         self.is_gen = is_gen
 
         # self._maybe_download_data()
         # self._maybe_make_slices()
 
-        if self.use_pcn_model_list:
-            if self.split == 'train':
-                list_path = join(root_dir, 'train.list')
-            elif self.split == 'val':
-                list_path = join(root_dir, 'val.list')
+        if self.use_list_with_name is not None:
+
+            if self.use_list_with_name == 'pcn':
+                list_path = join(root_dir, self.split +'.list')
+            elif self.use_list_with_name == 'msc':
+                list_path = join(root_dir, self.split + '_msc.list')
             else:
-                list_path = join(root_dir, 'test.list')
+                raise ValueError('use_list_with_name can have only values `pcn` or `msc`')
 
             with open(list_path) as file:
                 if classes:
@@ -77,7 +78,7 @@ class ShapeNetDataset(BaseDataset):
 
     def __getitem__(self, idx):
 
-        if self.use_pcn_model_list:
+        if self.use_list_with_name is not None:
             pc_category, pc_filename = self.point_clouds_names[idx // self.num_samples].split('/')
             pc_filename += '.ply'
         else:

@@ -1,13 +1,26 @@
 import argparse
 import os
 import numpy as np
-import trimesh
+
 from tqdm import tqdm
+import ray
 
 from utils.evaluation.chamfer import compute_trimesh_chamfer
 import glob
 from joblib import Parallel, delayed
-from utils.util import show_3d_cloud
+
+
+@ray.remote
+def process_one_tmd(gen_pcs):
+    sum_dist = 0
+    for j in range(len(gen_pcs)):
+        for k in range(j + 1, len(gen_pcs), 1):
+            pc1 = gen_pcs[j]
+            pc2 = gen_pcs[k]
+            chamfer_dist = compute_trimesh_chamfer(pc1, pc2)
+            sum_dist += chamfer_dist
+    mean_dist = sum_dist * 2 / (len(gen_pcs) - 1)
+    return mean_dist
 
 
 def process(shape_dir):
@@ -24,6 +37,12 @@ def process(shape_dir):
             pcs.append(np.load(pc_paths[i*10+j]).T)
         gen_pcs.append(pcs)
     gen_pcs = np.array(gen_pcs)
+
+    # ray.init(num_cpus=os.cpu_count())
+    # ray_tmd_tasks = [process_one_tmd.remote(gen_pcs[i]) for i in range(len(gen_pcs))]
+    # tmd = ray.get(ray_tmd_tasks)
+    # ray.shutdown()
+    # return np.mean(tmd)
 
     results = []
     for i in tqdm(range(len(gen_pcs))):

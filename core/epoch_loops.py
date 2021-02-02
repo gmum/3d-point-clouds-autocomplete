@@ -5,7 +5,7 @@ import numpy as np
 from model.full_model import FullModel
 
 
-def train_epoch(epoch, full_model, optimizer, loader, device, rec_loss_function, loss_coef=0.05):
+def train_epoch(epoch, full_model: FullModel, optimizer, loader, device, rec_loss_function, loss_coef=0.05):
     full_model.train()
     loss_all = 0.0
     loss_r = 0.0
@@ -25,7 +25,7 @@ def train_epoch(epoch, full_model, optimizer, loader, device, rec_loss_function,
         loss_r = torch.mean(
             loss_coef * rec_loss_function(gt, reconstruction.permute(0, 2, 1)))
 
-        if full_model.model_mode in [FullModel.Mode.DOUBLE_ENCODER, FullModel.Mode.RANDOM_ENCODER]:
+        if full_model.mode.has_generativity():
             loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
             loss_kld = torch.div(loss_kld, partial.shape[0])
             loss_all = loss_r + loss_kld
@@ -43,7 +43,7 @@ def train_epoch(epoch, full_model, optimizer, loader, device, rec_loss_function,
     loss_r = loss_r / i
 
     return full_model, optimizer, loss_all, loss_kld, loss_r, \
-           partial.cpu().numpy(), gt.cpu().numpy(), reconstruction.detach().cpu().numpy()
+           partial.detach().cpu().numpy(), gt.detach().cpu().numpy(), reconstruction.detach().cpu().numpy()
 
 
 def val_epoch(epoch, full_model, device, loaders_dict, val_classes_names, loss_function, loss_coef=0.05):
