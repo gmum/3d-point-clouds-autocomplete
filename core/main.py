@@ -1,11 +1,10 @@
 import json
 import logging
-
-from datetime import datetime
 from os.path import join
+from datetime import datetime
 
-import numpy as np
 import torch
+import numpy as np
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -19,7 +18,6 @@ from losses.champfer_loss import ChamferLoss
 from core.setup import seed_setup, logging_setup, cuda_setup, results_dir_setup, restore_model_state, \
     get_results_dir_path, restore_metrics, weights_init
 from utils.telegram_logging import TelegramLogger
-
 from utils.util import find_latest_epoch, save_plot, get_model_name
 
 
@@ -52,7 +50,7 @@ def main(config: dict):
     log.info(f'Current mode {run_mode}')
 
     if config['telegram_logger']['enable']:
-        tg_log = TelegramLogger.getLogger(config['telegram_logger'])
+        tg_log = TelegramLogger.get_logger(config['telegram_logger'])
 
     device = cuda_setup(config['setup']['gpu_id'])
     log.info(f'Device variable: {device}')
@@ -104,7 +102,7 @@ def main(config: dict):
             start_epoch_time = datetime.now()
             log.debug("Epoch: %s" % epoch)
 
-            full_model, optimizer, epoch_loss_all, epoch_loss_kld, epoch_loss_r, latest_partial, latest_gt, latest_rec \
+            full_model, optimizer, epoch_loss_all, epoch_loss_kld, epoch_loss_r, latest_existing, latest_gt, latest_rec \
                 = train_epoch(epoch, full_model, optimizer, train_dataloader, device, reconstruction_loss,
                               config['training']['loss_coef'])
             scheduler.step()
@@ -120,7 +118,7 @@ def main(config: dict):
 
             train_plots = []
             for k in range(min(5, latest_rec.shape[0])):
-                train_plots.append(save_plot(latest_partial[k], epoch, k, samples_path, 'partial'))
+                train_plots.append(save_plot(latest_existing[k], epoch, k, samples_path, 'existing'))
                 train_plots.append(save_plot(latest_rec[k], epoch, k, samples_path, 'reconstructed'))
                 train_plots.append(save_plot(latest_gt[k].T, epoch, k, samples_path, 'gt'))
 
@@ -149,7 +147,7 @@ def main(config: dict):
 
             val_plots = []
             for cat_name, sample in epoch_val_samples.items():
-                val_plots.append(save_plot(sample[0], epoch, cat_name, samples_path, 'val_partial'))
+                val_plots.append(save_plot(sample[0], epoch, cat_name, samples_path, 'val_existing'))
                 val_plots.append(save_plot(sample[2], epoch, cat_name, samples_path, 'val_rec'))
                 val_plots.append(save_plot(sample[1].T, epoch, cat_name, samples_path, 'val_gt'))
 

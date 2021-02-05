@@ -1,4 +1,5 @@
 import json
+from typing import List
 
 import requests
 
@@ -6,7 +7,7 @@ import requests
 class TelegramLogger(object):
 
     @staticmethod
-    def getLogger(config):
+    def get_logger(config):
         return TelegramLogger(config['bot_token'], config['chat_id'])
 
     def __init__(self, bot_token: str, chat_id: str, disable_req_log: bool = True):
@@ -30,7 +31,7 @@ class TelegramLogger(object):
         except Exception:
             pass
 
-    def log_images(self, image_paths, message: str = ''):
+    def log_images(self, image_paths: List[str], message: str = ''):
         try:
             send_data = {
                 'chat_id': self._chat_id,
