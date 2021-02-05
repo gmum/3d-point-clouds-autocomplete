@@ -1,12 +1,15 @@
+import random
+import glob
+from os.path import join
+
+import torch
 import numpy as np
 from tqdm import tqdm
 
-import random
-import glob
-import torch
-from os.path import join
-
 from utils.pytorch_structural_losses.nn_distance import nn_distance
+
+#  code is based on
+#  https://github.com/ChrisWu1997/Multimodal-Shape-Completion/blob/master/evaluation/mmd.py
 
 
 def iterate_in_chunks(l, n):

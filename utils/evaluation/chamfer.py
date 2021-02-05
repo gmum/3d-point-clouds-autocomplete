@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.spatial import cKDTree as KDTree
 
+# code from
+# https://github.com/ChrisWu1997/Multimodal-Shape-Completion/blob/master/evaluation/chamfer.py
+
 
 def compute_trimesh_chamfer(gt_points, gen_points, offset=0, scale=1):
     """
