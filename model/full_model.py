@@ -57,7 +57,7 @@ class FullModel(nn.Module):
         if existing.size(-1) == 3:
             existing.transpose_(existing.dim() - 2, existing.dim() - 1)
 
-        if noise is None and missing and missing.size(-1) == 3:
+        if noise is None and missing is not None and missing.size(-1) == 3:
             missing.transpose_(missing.dim() - 2, missing.dim() - 1)
 
         if gt_shape[-1] == 3:
