@@ -21,7 +21,8 @@ from tqdm import tqdm
 from models import aae
 from utils.pcutil import plot_3d_point_cloud
 from utils.telegram_logging import TelegramLogger
-from utils.util import find_latest_epoch, prepare_results_dir, cuda_setup, setup_logging, set_seed
+from core.setup import cuda_setup, logging_setup, seed_setup
+from utils.util import find_latest_epoch, prepare_results_dir
 from utils.points import generate_points
 from chamferdist import ChamferDistance
 from losses.champfer_loss import ChamferLoss
@@ -54,7 +55,7 @@ def save_plot(X, epoch, k, results_dir, t):
 
 
 def main(config):
-    set_seed(config['seed'])
+    seed_setup(config['seed'])
 
     results_dir = prepare_results_dir(config, 'vae', 'training')
     starting_epoch = find_latest_epoch(results_dir) + 1
@@ -166,27 +167,27 @@ def main(config):
         hyper_network.eval()
         real_data_encoder.eval()
 
-        benchmark_submission_dir = join(config['results_root'], 'benchmark', 'shapenet', 'test', 'partial', 'all')
+        benchmark_submission_dir = join(config['results_root'], 'benchmark', 'shapenet', 'test', 'existing', 'all')
         os.makedirs(benchmark_submission_dir, exist_ok=True)
 
         submission_zip = ZipFile('submission.zip', 'w')
 
         for i, point_data in tqdm(enumerate(test_dataloader, 1), total=len(test_dataloader)):
-            partial, _, model_id = point_data
-            partial = partial.to(device)
+            existing, _, model_id = point_data
+            existing = existing.to(device)
 
-            if partial.size(-1) == 3:
-                partial.transpose_(partial.dim() - 2, partial.dim() - 1)
+            if existing.size(-1) == 3:
+                existing.transpose_(existing.dim() - 2, existing.dim() - 1)
 
-            real_mu = real_data_encoder(partial)
+            real_mu = real_data_encoder(existing)
 
             target_networks_weights = hyper_network(real_mu)
 
-            X_rec = torch.zeros(partial.shape).to(device)
+            X_rec = torch.zeros(existing.shape).to(device)
             for j, target_network_weights in enumerate(target_networks_weights):
                 target_network = aae.TargetNetwork(config, target_network_weights).to(device)
-                target_network_input = generate_points(config=config, epoch=test_epoch, size=(partial.shape[2],
-                                                                                         partial.shape[1]))
+                target_network_input = generate_points(config=config, epoch=test_epoch, size=(existing.shape[2],
+                                                                                         existing.shape[1]))
                 X_rec[j] = torch.transpose(target_network(target_network_input.to(device)), 0, 1)
 
             X_rec = X_rec.detach().cpu()
@@ -248,19 +249,19 @@ def main(config):
         for i, point_data in tqdm(enumerate(train_dataloader, 1), total=len(train_dataloader)):
             e_hn_optimizer.zero_grad()
 
-            partial, gt, _ = point_data
-            partial = partial.to(device)
+            existing, gt, _ = point_data
+            existing = existing.to(device)
             gt = gt.to(device)
 
             # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
-            if partial.size(-1) == 3:
-                partial.transpose_(partial.dim() - 2, partial.dim() - 1)
+            if existing.size(-1) == 3:
+                existing.transpose_(existing.dim() - 2, existing.dim() - 1)
 
             if gt.size(-1) == 3:
                 gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
-            # codes, mu, logvar = encoder(partial)
-            real_mu = real_data_encoder(partial)
+            # codes, mu, logvar = encoder(existing)
+            real_mu = real_data_encoder(existing)
 
             # target_networks_weights = hyper_network(torch.cat([codes, real_mu], 1))
 
@@ -291,7 +292,7 @@ def main(config):
 
             # loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
             # loss_kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-            # loss_kld = torch.div(loss_kld, partial.shape[0])
+            # loss_kld = torch.div(loss_kld, existing.shape[0])
             loss_all = loss_r # + loss_kld
 
             total_loss_r += loss_r.item()
@@ -315,15 +316,15 @@ def main(config):
 
         log.info(log_string)
 
-        partial = partial.cpu().numpy()
+        existing = existing.cpu().numpy()
         gt = gt.cpu().numpy()
         X_rec = X_rec.detach().cpu().numpy()
 
         saved_plots = []
         for k in range(min(5, X_rec.shape[0])):
-            saved_plots.append(save_plot(partial[k], epoch, k, results_dir, 'cut'))
+            saved_plots.append(save_plot(existing[k], epoch, k, results_dir, 'cut'))
             saved_plots.append(save_plot(X_rec[k], epoch, k, results_dir, 'reconstructed'))
-            saved_plots.append(save_plot(gt[k], epoch, k, results_dir, 'real'))
+            saved_plots.append(save_plot(gt[k], epoch, k, results_dir, 'existing'))
 
         if config['use_telegram_logging']:
             tg_log.log_images(saved_plots[:9], log_string)
@@ -348,21 +349,21 @@ def main(config):
 
                     for i, point_data in enumerate(dl, 1):
 
-                        partial, gt, _ = point_data
-                        partial = partial.to(device)
+                        existing, gt, _ = point_data
+                        existing = existing.to(device)
                         gt = gt.to(device)
 
                         # Change dim [BATCH, N_POINTS, N_DIM] -> [BATCH, N_DIM, N_POINTS]
-                        if partial.size(-1) == 3:
-                            partial.transpose_(partial.dim() - 2, partial.dim() - 1)
+                        if existing.size(-1) == 3:
+                            existing.transpose_(existing.dim() - 2, existing.dim() - 1)
 
                         if gt.size(-1) == 3:
                             gt.transpose_(gt.dim() - 2, gt.dim() - 1)
 
-                        # _, random_mu, _ = encoder(partial)
+                        # _, random_mu, _ = encoder(existing)
 
-                        # fixed_noise = torch.zeros(partial.shape[0], config['random_encoder_output_size'])  # .normal_(mean=0.0, std=0.015)  # TODO consider about mean and std
-                        real_mu = real_data_encoder(partial)
+                        # fixed_noise = torch.zeros(existing.shape[0], config['random_encoder_output_size'])  # .normal_(mean=0.0, std=0.015)  # TODO consider about mean and std
+                        real_mu = real_data_encoder(existing)
 
                         # target_networks_weights = hyper_network(torch.cat([random_mu, real_mu], 1))
 
@@ -387,11 +388,11 @@ def main(config):
                         total_loss_torch3d_cd += loss_torch3d_cd.item()
                         total_loss_gr_cd += loss_gr_cd.item()
 
-                    partial = partial.cpu().numpy()
+                    existing = existing.cpu().numpy()
                     gt = gt.cpu().numpy()
                     X_rec = X_rec.detach().cpu().numpy()
 
-                    val_plots.append(save_plot(partial[0], epoch, cat_name, results_dir, 'val_partial'))
+                    val_plots.append(save_plot(existing[0], epoch, cat_name, results_dir, 'val_existing'))
                     val_plots.append(save_plot(X_rec[0], epoch, cat_name, results_dir, 'val_rec'))
                     val_plots.append(save_plot(gt[0], epoch, cat_name, results_dir, 'val_gt'))
 

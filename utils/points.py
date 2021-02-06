@@ -1,6 +1,9 @@
 import torch
 import numpy as np
 
+# code from
+# https://github.com/gmum/3d-point-clouds-HyperCloud/blob/master/utils/points.py
+
 
 def generate_points_from_uniform_distribution(size, low=-1, high=1):
     while True:

@@ -10,7 +10,9 @@ from os.path import join, exists
 from datasets.base_dataset import BaseDataset
 from datasets.utils.shapenet_category_mapping import synth_id_to_category
 from utils.plyfile import load_ply
-from utils.util import show_3d_cloud
+
+# code is based on
+# https://github.com/ChrisWu1997/Multimodal-Shape-Completion/blob/master/dataset/dataset_3depn.py
 
 
 def downsample_point_cloud(points, n_pts):
@@ -111,7 +113,7 @@ class ShapeNet3DEPNDataset(BaseDataset):
             raw_pc = sample_point_cloud_by_n(raw_pc, 1024)
             raw_pc = torch.tensor(raw_pc, dtype=torch.float32)
 
-            # process real complete shapes
+            # process existing complete shapes
             real_shape_name = self.shape_names[index]
             real_ply_path = os.path.join(self.cat_pc_root, real_shape_name + '.ply')
             real_pc = np.array(trimesh.load(real_ply_path).vertices)
@@ -121,13 +123,12 @@ class ShapeNet3DEPNDataset(BaseDataset):
             return raw_pc, 0, real_pc, real_shape_name
         else:
             pc_filename = self.shape_names[index // self.num_samples]
-            partial = load_ply(join(self.root_dir, 'slices', 'partial', self.cat,
+            existing = load_ply(join(self.root_dir, 'slices', 'existing', self.cat,
                                     str(index % self.num_samples) + '~' + pc_filename))
-            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', self.cat,
+            missing = load_ply(join(self.root_dir, 'slices', 'missing', self.cat,
                                       str(index % self.num_samples) + '~' + pc_filename))
             gt = load_ply(join(self.root_dir, 'slices', 'gt', self.cat, pc_filename))
-            return partial, remaining, gt, pc_filename[:-4]
-
+            return existing, missing, gt, pc_filename[:-4]
 
     def __len__(self):
         if self.split == 'test':
@@ -139,7 +140,6 @@ class ShapeNet3DEPNDataset(BaseDataset):
         rot_m = np.array([[2.22044605e-16, 0.00000000e+00, 1.00000000e+00],
                           [0.00000000e+00, 1.00000000e+00, 0.00000000e+00],
                           [-1.00000000e+00, 0.00000000e+00, 2.22044605e-16]])
-
         return np.dot(rot_m, points.T).T
 
     @classmethod

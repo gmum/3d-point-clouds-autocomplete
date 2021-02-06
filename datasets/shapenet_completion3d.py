@@ -40,12 +40,12 @@ class ShapeNetCompletion3DDataset(BaseDataset):
 
     def __getitem__(self, index):
         model_name = self.model_list[index]
-        partial = self._load_h5(os.path.join(self.root_dir, self.split, 'partial', model_name + '.h5'))
+        existing = self._load_h5(os.path.join(self.root_dir, self.split, 'partial', model_name + '.h5'))
         if self.split != 'test':
             gt = self._load_h5(os.path.join(self.root_dir, self.split, 'gt', model_name + '.h5'))
         else:
-            gt = partial
-        return partial, 0, gt, model_name
+            gt = existing
+        return existing, 0, gt, model_name
 
     @classmethod
     def get_validation_datasets(cls, root_dir, classes=[], **kwargs):

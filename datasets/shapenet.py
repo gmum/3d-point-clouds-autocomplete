@@ -1,9 +1,6 @@
 import os
-import shutil
-import urllib
-from os import listdir, makedirs, remove
+from os import listdir
 from os.path import exists, join
-from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
@@ -12,7 +9,8 @@ from datasets.base_dataset import BaseDataset
 from datasets.utils.shapenet_category_mapping import synth_id_to_category, category_to_synth_id, synth_id_to_number
 from utils.plyfile import load_ply
 from datasets.utils.dataset_generator import SlicedDatasetGenerator
-from utils.util import resample_pcd
+from utils.util import resample_pcd, get_filenames_by_cat
+
 
 class ShapeNetDataset(BaseDataset):
 
@@ -29,7 +27,6 @@ class ShapeNetDataset(BaseDataset):
         self.num_samples = num_samples
         self.is_gen = is_gen
 
-        # self._maybe_download_data()
         # self._maybe_make_slices()
 
         if self.use_list_with_name is not None:
@@ -47,8 +44,7 @@ class ShapeNetDataset(BaseDataset):
                 else:
                     self.point_clouds_names = [line.strip() for line in file]
         else:
-            pc_df = self._get_names(self.root_dir)
-
+            pc_df = get_filenames_by_cat(self.root_dir)
             if classes:
                 if classes[0] not in synth_id_to_category.keys():
                     classes = [category_to_synth_id[c] for c in classes]
@@ -62,7 +58,7 @@ class ShapeNetDataset(BaseDataset):
                     [pc_df[pc_df['category'] == c][:int(0.85 * len(pc_df[pc_df['category'] == c]))]
                          .reset_index(drop=True) for c in classes])
             elif self.split == 'val':
-                # remaining 5%
+                # missing 5%
                 self.point_clouds_names = pd.concat([pc_df[pc_df['category'] == c][
                                                      int(0.85 * len(pc_df[pc_df['category'] == c])):int(
                                                          0.9 * len(pc_df[pc_df['category'] == c]))]
@@ -92,60 +88,20 @@ class ShapeNetDataset(BaseDataset):
         scan_idx = str(idx % self.num_samples)
 
         if self.is_gen:
-            partial = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'right', pc_category, pc_filename)), 1024)
-            remaining = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'left', pc_category, pc_filename)), 1024)
+            existing = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'right', pc_category, pc_filename)), 1024)
+            missing = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'left', pc_category, pc_filename)), 1024)
             gt = load_ply(join(self.root_dir, 'test_gen', 'gt', pc_category, pc_filename))
         else:
-            partial = load_ply(join(self.root_dir, 'slices', 'real', pc_category, scan_idx + '~' + pc_filename))
-            remaining = load_ply(join(self.root_dir, 'slices', 'remaining', pc_category, scan_idx + '~' + pc_filename))
+            existing = load_ply(join(self.root_dir, 'slices', 'existing', pc_category, scan_idx + '~' + pc_filename))
+            missing = load_ply(join(self.root_dir, 'slices', 'missing', pc_category, scan_idx + '~' + pc_filename))
             gt = load_ply(join(self.root_dir, pc_category, pc_filename))
 
-
         if self.is_random_rotated:
-            partial = partial @ random_rotation_matrix
-            remaining = remaining @ random_rotation_matrix
+            existing = existing @ random_rotation_matrix
+            missing = missing @ random_rotation_matrix
             gt = gt @ random_rotation_matrix
 
-        return partial, remaining, gt, synth_id_to_number[pc_category]
-
-    def _get_names(self, path) -> pd.DataFrame:
-        filenames = []
-        for category_id in synth_id_to_category.keys():
-            for f in listdir(join(path, category_id)):
-                if f not in ['.DS_Store']:
-                    filenames.append((category_id, f))
-        return pd.DataFrame(filenames, columns=['category', 'filename'])
-
-    def _maybe_download_data(self):
-        if exists(self.root_dir):
-            return
-
-        print(f'ShapeNet doesn\'t exist in root directory {self.root_dir}. '
-              f'Downloading...')
-        makedirs(self.root_dir)
-
-        url = 'https://www.dropbox.com/s/vmsdrae6x5xws1v/shape_net_core_uniform_samples_2048.zip?dl=1'
-
-        data = urllib.request.urlopen(url)
-        filename = url.rpartition('/')[2][:-5]
-        file_path = join(self.root_dir, filename)
-        with open(file_path, mode='wb') as f:
-            d = data.read()
-            f.write(d)
-
-        print('Extracting...')
-        with ZipFile(file_path, mode='r') as zip_f:
-            zip_f.extractall(self.root_dir)
-
-        remove(file_path)
-
-        extracted_dir = join(self.root_dir,
-                             'shape_net_core_uniform_samples_2048')
-        for d in listdir(extracted_dir):
-            shutil.move(src=join(extracted_dir, d),
-                        dst=self.root_dir)
-
-        shutil.rmtree(extracted_dir)
+        return existing, missing, gt, synth_id_to_number[pc_category]
 
     def _maybe_make_slices(self):
         if exists(self.root_dir + '/slices'):
@@ -154,10 +110,10 @@ class ShapeNetDataset(BaseDataset):
         print("Generating slices...")
 
         for category in synth_id_to_category.keys():
-            os.makedirs(self.root_dir + '/slices/real/' + category, exist_ok=True)
-            os.makedirs(self.root_dir + '/slices/remaining/' + category, exist_ok=True)
+            os.makedirs(self.root_dir + '/slices/existing/' + category, exist_ok=True)
+            os.makedirs(self.root_dir + '/slices/missing/' + category, exist_ok=True)
 
-        SlicedDatasetGenerator(self.root_dir, self.transform).generate(self._get_names(self.root_dir).iterrows())
+        # SlicedDatasetGenerator(self.root_dir, self.transform).generate(self._get_names(self.root_dir).iterrows())
 
         print("Dataset generated")
 

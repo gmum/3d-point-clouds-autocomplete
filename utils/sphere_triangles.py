@@ -3,6 +3,8 @@ import numpy as np
 from collections import namedtuple
 import torch
 
+# code from
+# https://github.com/gmum/3d-point-clouds-HyperCloud/blob/master/utils/sphere_triangles.py
 
 Triangle = namedtuple("Triangle", "a,b,c")
 Point = namedtuple("Point", "x,y,z")

@@ -1,10 +1,4 @@
-import os
-from os.path import join
-
 import numpy as np
-import ray
-
-from utils.plyfile import load_ply, quick_save_ply_file
 
 
 class HyperPlane(object):
@@ -31,10 +25,6 @@ class HyperPlane(object):
 
 class SlicedDatasetGenerator(object):
 
-    def __init__(self, root_dir=None, transform=None):
-        self.root_dir = root_dir
-        self.transform = transform
-
     @staticmethod
     def generate_item(points, target_partition_points=1024):
 
@@ -47,24 +37,3 @@ class SlicedDatasetGenerator(object):
                 return points_under_plane, points_above_plane
             if target_partition_points == len(points_above_plane):
                 return points_above_plane, points_under_plane
-
-    @ray.remote
-    def __generating_slices(self, category: str, filename: str):
-        pc_filepath = join(self.root_dir, category, filename)
-        points = load_ply(pc_filepath)
-
-        if self.transform:
-            points = self.transform(points)
-
-        for i in range(4):
-            partial, remaining = self.generate_item(points)
-            quick_save_ply_file(partial, join(self.root_dir, 'slices', 'real', category,
-                                              str(i) + '~' + filename))
-            quick_save_ply_file(remaining, join(self.root_dir, 'slices', 'remaining', category,
-                                                str(i) + '~' + filename))
-
-    def generate(self, pc_df_iter):
-        ray.init(num_cpus=os.cpu_count())
-        ray.get([self.__generating_slices.remote(self, row['category'], row['filename']) for _, row in
-                 pc_df_iter])
-        ray.shutdown()

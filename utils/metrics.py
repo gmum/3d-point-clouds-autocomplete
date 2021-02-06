@@ -1,13 +1,16 @@
+import warnings
+
 import torch
 import numpy as np
-import warnings
+from tqdm import tqdm
+from numpy.linalg import norm
 from scipy.stats import entropy
 from sklearn.neighbors import NearestNeighbors
-from numpy.linalg import norm
 
-# Import CUDA version of approximate EMD, from https://github.com/zekunhao1995/pcgan-pytorch//:
-from tqdm import tqdm
+# code is based on
+# https://github.com/stevenygd/PointFlow/blob/master/metrics/evaluation_metrics.py
 
+# Import CUDA version of approximate EMD, from https://github.com/zekunhao1995/pcgan-pytorch/:
 from utils.pytorch_structural_losses.match_cost import match_cost
 from utils.pytorch_structural_losses.nn_distance import nn_distance
 

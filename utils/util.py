@@ -1,53 +1,13 @@
-import logging
 import re
-from os import listdir, makedirs
+from os import listdir
 from os.path import join, exists
-from shutil import rmtree
-from time import sleep
-import random
+
 import numpy as np
-
-import torch
-
-from utils.pcutil import plot_3d_point_cloud
+import pandas as pd
 import matplotlib.pyplot as plt
 
-
-def setup_logging(log_dir):
-    makedirs(log_dir, exist_ok=True)
-
-    logpath = join(log_dir, 'log.txt')
-    filemode = 'a' if exists(logpath) else 'w'
-
-    # set up logging to file - see previous section for more details
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s %(message)s',
-                        datefmt='%m-%d %H:%M:%S',
-                        filename=logpath,
-                        filemode=filemode)
-    # define a Handler which writes INFO messages or higher to the sys.stderr
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    # set a format which is simpler for console use
-    formatter = logging.Formatter('%(asctime)s: %(levelname)-8s %(message)s')
-    # tell the handler to use this format
-    console.setFormatter(formatter)
-    # add the handler to the root logger
-    logging.getLogger('').addHandler(console)
-
-
-def prepare_results_dir(config, arch, experiment, dirs_to_create=('weights', 'samples', 'metrics')):
-    output_dir = join(config['results_root'], arch, experiment, get_distribution_dir(config), config['dataset']['name'],
-                      get_classes_dir(config['dataset']), config['model_name'])
-    if config['clean_results_dir']:
-        if exists(output_dir):
-            print('Attention! Cleaning results directory in 10 seconds!')
-            sleep(10)
-        rmtree(output_dir, ignore_errors=True)
-    makedirs(output_dir, exist_ok=True)
-    for dir_to_create in dirs_to_create:
-        makedirs(join(output_dir, dir_to_create), exist_ok=True)
-    return output_dir
+from datasets.utils.shapenet_category_mapping import synth_id_to_category
+from utils.pcutil import plot_3d_point_cloud
 
 
 def find_latest_epoch(dirpath):
@@ -61,35 +21,6 @@ def find_latest_epoch(dirpath):
         if m:
             epochs_completed.append(int(m.group('n_epoch')))
     return max(epochs_completed) if epochs_completed else 0
-
-
-def cuda_setup(cuda=False, gpu_idx=0):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    torch.cuda.set_device(gpu_idx)
-    return device
-
-
-def set_seed(seed: int = 0):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-
-def get_weights_dir(config):
-    if config.get('weights_path'):
-        weights_dir = config['weights_path']
-    else:
-        '''weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
-                           config['dataset']['name'], get_classes_dir(config), 'weights')'''
-        weights_dir = join(config['results_root'], config['arch'], 'training', get_distribution_dir(config),
-                           config['dataset']['name'], get_classes_dir(config), config['model_name'], 'weights')
-    if exists(weights_dir):
-        return weights_dir
-    raise FileNotFoundError(weights_dir)
 
 
 def get_classes_dir(config):
@@ -132,7 +63,6 @@ def get_model_name(config):
 
 def show_3d_cloud(points_cloud):
     import pptk
-    # pptk.viewer(points_cloud).set(show_axis=False)
     pptk.viewer(points_cloud).set()
 
 
@@ -143,6 +73,15 @@ def replace_and_rename_pcd_file(source, dest):
         for sample in listdir(join(source, model_id)):
             for filename in listdir(join(source, model_id, sample)):
                 copyfile(join(source, model_id, sample, filename), join(dest, f'{model_id}_{sample}_{filename}'))
+
+
+def get_filenames_by_cat(path) -> pd.DataFrame:
+    filenames = []
+    for category_id in synth_id_to_category.keys():
+        for f in listdir(join(path, category_id)):
+            if f not in ['.DS_Store']:
+                filenames.append((category_id, f))
+    return pd.DataFrame(filenames, columns=['category', 'filename'])
 
 
 def save_plot(X, epoch, k, results_dir, t):

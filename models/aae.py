@@ -174,7 +174,7 @@ class Discriminator(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.z_size = config['remaining_size']
+        self.z_size = config['missing_size']
         self.use_bias = config['model']['D']['use_bias']
         self.relu_slope = config['model']['D']['relu_slope']
         self.dropout = config['model']['D']['dropout']

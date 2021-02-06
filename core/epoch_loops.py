@@ -14,20 +14,20 @@ def train_epoch(epoch, full_model: FullModel, optimizer, loader, device, rec_los
     for i, point_data in tqdm(enumerate(loader, 1), total=len(loader)):
         optimizer.zero_grad()
 
-        partial, remaining, gt, _ = point_data
+        existing, missing, gt, _ = point_data
 
-        partial = partial.to(device)
-        remaining = remaining.to(device)
+        existing = existing.to(device)
+        missing = missing.to(device)
         gt = gt.to(device)
 
-        reconstruction, logvar, mu = full_model(partial, remaining, list(gt.shape), epoch, device)
+        reconstruction, logvar, mu = full_model(existing, missing, list(gt.shape), epoch, device)
 
         loss_r = torch.mean(
             loss_coef * rec_loss_function(gt, reconstruction.permute(0, 2, 1)))
 
         if full_model.mode.has_generativity():
             loss_kld = 0.5 * (torch.exp(logvar) + torch.square(mu) - 1 - logvar).sum()
-            loss_kld = torch.div(loss_kld, partial.shape[0])
+            loss_kld = torch.div(loss_kld, existing.shape[0])
             loss_all = loss_r + loss_kld
             loss_kld += loss_kld.item()
         else:
@@ -43,7 +43,7 @@ def train_epoch(epoch, full_model: FullModel, optimizer, loader, device, rec_los
     loss_r = loss_r / i
 
     return full_model, optimizer, loss_all, loss_kld, loss_r, \
-           partial.detach().cpu().numpy(), gt.detach().cpu().numpy(), reconstruction.detach().cpu().numpy()
+           existing.detach().cpu().numpy(), gt.detach().cpu().numpy(), reconstruction.detach().cpu().numpy()
 
 
 def val_epoch(epoch, full_model, device, loaders_dict, val_classes_names, loss_function, loss_coef=0.05):
@@ -56,23 +56,23 @@ def val_epoch(epoch, full_model, device, loaders_dict, val_classes_names, loss_f
         for cat_name, dl in loaders_dict.items():
             loss = 0.0
             for i, point_data in enumerate(dl, 1):
-                partial, remaining, gt, _ = point_data
-                partial = partial.to(device)
-                remaining = remaining.to(device)
+                existing, missing, gt, _ = point_data
+                existing = existing.to(device)
+                missing = missing.to(device)
                 gt = gt.to(device)
 
-                reconstruction = full_model(partial, remaining, list(gt.shape), epoch, device)
+                reconstruction = full_model(existing, missing, list(gt.shape), epoch, device)
 
                 loss_our_cd = torch.mean(
                     loss_coef * loss_function(gt, reconstruction.permute(0, 2, 1)))
 
                 loss += loss_our_cd.item()
 
-            partial = partial.cpu().numpy()
+            existing = existing.cpu().numpy()
             gt = gt.cpu().numpy()
             reconstruction = reconstruction.detach().cpu().numpy()
 
-            val_samples[cat_name] = (partial[0], gt[0], reconstruction[0])
+            val_samples[cat_name] = (existing[0], gt[0], reconstruction[0])
             val_losses[cat_name] = np.array([loss / i])
 
         total = np.zeros(1)

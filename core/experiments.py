@@ -4,8 +4,10 @@ import os
 import shutil
 from datetime import datetime
 import json
-from os.path import join
+from os.path import join, basename
+from zipfile import ZipFile
 
+import h5py
 from sklearn import manifold
 from tqdm import tqdm
 import torch
@@ -18,13 +20,11 @@ from losses.champfer_loss import ChamferLoss
 from model.full_model import FullModel
 from utils.metrics import compute_all_metrics, jsd_between_point_cloud_sets
 from utils.pcutil import plot_3d_point_cloud
-from utils.util import show_3d_cloud
 
 
 def fixed(full_model: FullModel, device, dataset, results_dir: str, epoch, amount=30, mean=0.0, std=0.015,
-          noises_per_item=10, batch_size=8,
+          noises_per_item=10, batch_size=8, save_plots=False,
           triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
-
     # clean dir
     shutil.rmtree(join(results_dir, 'fixed'), ignore_errors=True)
     os.makedirs(join(results_dir, 'fixed'), exist_ok=True)
@@ -32,38 +32,37 @@ def fixed(full_model: FullModel, device, dataset, results_dir: str, epoch, amoun
     dataloader = DataLoader(dataset, batch_size=batch_size)
     for i, data in tqdm(enumerate(dataloader), total=len(dataloader)):
 
-        partial, _, _, idx = data
-
-        # from scipy.spatial.transform import Rotation
-        #for k in range(partial.shape[0]):
-        #    partial[k] = partial[k] @ Rotation.from_euler('y', 90, degrees=True).as_matrix().astype(np.float32) @ Rotation.from_euler('x', 270, degrees=True).as_matrix().astype(np.float32)
-
-        partial = partial.to(device)
+        existing, _, _, idx = data
+        existing = existing.to(device)
 
         for j in range(noises_per_item):
-            fixed_noise = torch.zeros(partial.shape[0], full_model.get_noise_size()).normal_(mean=mean, std=std).to(device)
+            fixed_noise = torch.zeros(existing.shape[0], full_model.get_noise_size()).normal_(mean=mean, std=std).to(
+                device)
 
-            reconstruction = full_model(partial, None, [partial.shape[0], 2048, 3], epoch, device, noise=fixed_noise).cpu()
+            reconstruction = full_model(existing, None, [existing.shape[0], 2048, 3], epoch, device,
+                                        noise=fixed_noise).cpu()
             for k in range(reconstruction.shape[0]):
-                # reconstruction[k] = (reconstruction[k].T  @ Rotation.from_euler('x', -270, degrees=True).as_matrix().astype(np.float32) @ Rotation.from_euler('y', -90, degrees=True).as_matrix().astype(np.float32)).T
-                np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_{j}_reconstruction'), reconstruction[k].numpy())
-                #np.save(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_noise'), np.array(fixed_noise[k].cpu().numpy()))
-                #fig = plot_3d_point_cloud(reconstruction[k][0], reconstruction[k][1], reconstruction[k][2], in_u_sphere=True, show=False)
-                #fig.savefig(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_reconstructed.png'))
-                #plt.close(fig)
+                np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_{j}_reconstruction'),
+                        reconstruction[k].numpy())
+                if save_plots:
+                    fig = plot_3d_point_cloud(reconstruction[k][0], reconstruction[k][1], reconstruction[k][2],
+                                              in_u_sphere=True, show=False)
+                    fig.savefig(join(results_dir, 'fixed', f'{i * batch_size + k}_{j}_fixed_reconstructed.png'))
+                    plt.close(fig)
+                # np.save(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_noise'), np.array(fixed_noise[k].cpu().numpy()))
 
             # dataset.inverse_scale_to_scene(idx, reconstruction.T.numpy())
 
             # np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'),
-            #        dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to real data fixed experiment
+            #        dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to existing data fixed experiment
 
-        partial = partial.cpu()
-        for k in range(partial.shape[0]):
-            np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_partial'), np.array(partial[k].cpu().numpy()))
-            #fig = plot_3d_point_cloud(partial[k][0], partial[k][1], partial[k][2], in_u_sphere=True, show=False)
-            #fig.savefig(join(results_dir, 'fixed', f'{i*batch_size+k}_partial.png'))
-            #plt.close(fig)
-
+        existing = existing.cpu()
+        for k in range(existing.shape[0]):
+            np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_existing'), np.array(existing[k].cpu().numpy()))
+            if save_plots:
+                fig = plot_3d_point_cloud(existing[k][0], existing[k][1], existing[k][2], in_u_sphere=True, show=False)
+                fig.savefig(join(results_dir, 'fixed', f'{i * batch_size + k}_existing.png'))
+                plt.close(fig)
 
 
 def evaluate_generativity(full_model: FullModel, device, datasets_dict, results_dir, epoch, batch_size, num_workers,
@@ -77,22 +76,22 @@ def evaluate_generativity(full_model: FullModel, device, datasets_dict, results_
         for cat_name, dl in dataloaders_dict.items():
             cat_gt = []
             for data in dl:
-                _, remaining, _, _ = data
-                remaining = remaining.to(device)
-                cat_gt.append(remaining)
+                _, missing, _, _ = data
+                missing = missing.to(device)
+                cat_gt.append(missing)
             cat_gt = torch.cat(cat_gt).contiguous()
 
             cat_results = {}
 
             for data in tqdm(dl, total=len(dl)):
-                partial, _, _, _ = data
-                partial = partial.to(device)
+                existing, _, _, _ = data
+                existing = existing.to(device)
 
                 obj_recs = []
 
                 for j in range(len(cat_gt)):
                     fixed_noise = torch.zeros(1, full_model.get_noise_size()).normal_(mean=mean, std=std).to(device)
-                    reconstruction = full_model(partial, None, [1, 2048, 3], epoch, device, noise=fixed_noise)
+                    reconstruction = full_model(existing, None, [1, 2048, 3], epoch, device, noise=fixed_noise)
 
                     pc = reconstruction.cpu().detach().numpy()[0]
                     obj_recs.append(torch.from_numpy(pc.T[pc[1].argsort()[:1024]]).unsqueeze(0).to(device))
@@ -111,8 +110,6 @@ def evaluate_generativity(full_model: FullModel, device, datasets_dict, results_
 
 
 def compute_mmd_tmd_uhd(full_model: FullModel, device, dataset, results_dir, epoch, batch_size=64):
-
-
     from utils.evaluation.total_mutual_diff import process as tmd
     from utils.evaluation.completeness import process as uhd
     from utils.evaluation.mmd import process as mmd
@@ -150,58 +147,58 @@ def merge_different_categories(full_model, device, dataset, results_dir, epoch, 
 
     with torch.no_grad():
         for i in range(amount):
-            f_partial, f_remaining, f_gt, _ = first_cat_dataset[first_cat_ids[i]]
+            f_existing, f_missing, f_gt, _ = first_cat_dataset[first_cat_ids[i]]
 
-            s_partial, s_remaining, s_gt, _ = second_cat_dataset[second_cat_ids[i]]
+            s_existing, s_missing, s_gt, _ = second_cat_dataset[second_cat_ids[i]]
 
-            f_partial = f_gt[f_gt.T[0].argsort()[1024:]]
-            f_remaining = f_gt[f_gt.T[0].argsort()[:1024]]
-            s_partial = s_gt[s_gt.T[0].argsort()[1024:]]
-            s_remaining = s_gt[s_gt.T[0].argsort()[:1024]]
+            f_existing = f_gt[f_gt.T[0].argsort()[1024:]]
+            f_missing = f_gt[f_gt.T[0].argsort()[:1024]]
+            s_existing = s_gt[s_gt.T[0].argsort()[1024:]]
+            s_missing = s_gt[s_gt.T[0].argsort()[:1024]]
 
-            np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}_partial'), f_partial)
-            np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}_remaining'), f_remaining)
+            np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}_existing'), f_existing)
+            np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}_missing'), f_missing)
             np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}_gt'), f_gt)
 
-            np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}_partial'), s_partial)
-            np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}_remaining'), s_remaining)
+            np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}_existing'), s_existing)
+            np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}_missing'), s_missing)
             np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}_gt'), s_gt)
 
-            f_partial = torch.from_numpy(f_partial).unsqueeze(0).to(device)
-            s_partial = torch.from_numpy(s_partial).unsqueeze(0).to(device)
+            f_existing = torch.from_numpy(f_existing).unsqueeze(0).to(device)
+            s_existing = torch.from_numpy(s_existing).unsqueeze(0).to(device)
 
             gt_shape = list(torch.from_numpy(f_gt).unsqueeze(0).shape)
 
             for j in range(amount):
-                _, temp_f_remaining, temp_f_gt, _ = first_cat_dataset[first_cat_ids[j]]
-                _, temp_s_remaining, temp_s_gt, _ = second_cat_dataset[second_cat_ids[j]]
+                _, temp_f_missing, temp_f_gt, _ = first_cat_dataset[first_cat_ids[j]]
+                _, temp_s_missing, temp_s_gt, _ = second_cat_dataset[second_cat_ids[j]]
 
-                temp_f_remaining = temp_f_gt[temp_f_gt.T[0].argsort()[:1024]]
-                temp_s_remaining = temp_s_gt[temp_s_gt.T[0].argsort()[:1024]]
+                temp_f_missing = temp_f_gt[temp_f_gt.T[0].argsort()[:1024]]
+                temp_s_missing = temp_s_gt[temp_s_gt.T[0].argsort()[:1024]]
 
-                temp_f_remaining = torch.from_numpy(temp_f_remaining).unsqueeze(0).to(device)
-                temp_s_remaining = torch.from_numpy(temp_s_remaining).unsqueeze(0).to(device)
+                temp_f_missing = torch.from_numpy(temp_f_missing).unsqueeze(0).to(device)
+                temp_s_missing = torch.from_numpy(temp_s_missing).unsqueeze(0).to(device)
 
-                rec_ff = full_model(f_partial, temp_f_remaining, gt_shape, epoch, device)
+                rec_ff = full_model(f_existing, temp_f_missing, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}~{first_cat}_{j}_rec'),
                         rec_ff.cpu().numpy()[0].T)
 
-                rec_fs = full_model(f_partial, temp_s_remaining, gt_shape, epoch, device)
+                rec_fs = full_model(f_existing, temp_s_missing, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{first_cat}_{i}~{second_cat}_{j}_rec'),
                         rec_fs.cpu().numpy()[0].T)
 
-                rec_sf = full_model(s_partial, temp_f_remaining, gt_shape, epoch, device)
+                rec_sf = full_model(s_existing, temp_f_missing, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}~{first_cat}_{j}_rec'),
                         rec_sf.cpu().numpy()[0].T)
 
-                rec_ss = full_model(s_partial, temp_f_remaining, gt_shape, epoch, device)
+                rec_ss = full_model(s_existing, temp_f_missing, gt_shape, epoch, device)
                 np.save(join(results_dir, 'merge_different_categories', f'{second_cat}_{i}~{second_cat}_{j}_rec'),
                         rec_ss.cpu().numpy()[0].T)
 
 
 def same_model_different_slices(full_model, device, datasets_dict, results_dir, epoch, amount=10, slices_number=10,
                                 mean=0.0, std=0.015):
-    def process_partial(pcd, cat_name, name, i, j):
+    def process_existing(pcd, cat_name, name, i, j):
         np.save(join(results_dir, 'same_model_different_slices', f'{cat_name}_{i}_{j}_{name}_pcd'), pcd)
         noise = torch.zeros(1, full_model.get_noise_size()).normal_(mean=mean, std=std)
         np.save(join(results_dir, 'same_model_different_slices', f'{cat_name}_{i}_{j}_{name}_noise'), noise.numpy())
@@ -229,13 +226,34 @@ def same_model_different_slices(full_model, device, datasets_dict, results_dir, 
                 np.save(join(results_dir, 'same_model_different_slices', f'{cat_name}_{i}_gt'), points)
                 for j in range(slices_number):
                     f_pcd, s_pcd = SlicedDatasetGenerator.generate_item(points, 1024)
-                    process_partial(f_pcd, cat_name, 'f', i, j)
-                    process_partial(s_pcd, cat_name, 's', i, j)
+                    process_existing(f_pcd, cat_name, 'f', i, j)
+                    process_existing(s_pcd, cat_name, 's', i, j)
+
+
+def completion3d_submission(full_model, device, datasets_dict, results_dir, epoch, batch_size=1):
+    benchmark_dir = join(results_dir, 'completion3d_submission')
+
+    shutil.rmtree(benchmark_dir, ignore_errors=True)
+    os.makedirs(benchmark_dir, exist_ok=True)
+
+    submission_zip = ZipFile('submission.zip', 'w')
+
+    test_dataloader = DataLoader(datasets_dict['all'], batch_size=batch_size)
+
+    for i, point_data in tqdm(enumerate(test_dataloader, 1), total=len(test_dataloader)):
+        existing, _, _, model_id = point_data
+        existing = existing.to(device)
+        reconstruction = full_model(existing, None, [batch_size, 2048, 3], epoch, device).cpu()
+        for idx, x in enumerate(reconstruction.permute(0, 2, 1)):
+            ofile = join(benchmark_dir, model_id[idx].split('/')[-1] + '.h5')
+            with h5py.File(ofile, "w") as f:
+                f.create_dataset("data", data=x.numpy())
+                f.close()
+            submission_zip.write(ofile, 'all/' + basename(ofile))
 
 
 def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
     pass
-
 
     cat_name = 'car'
     amount = 100
@@ -253,21 +271,17 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
         latent_dist[i] = np.linalg.norm(cat_test_tsne[2 * i] - cat_test_tsne[2 * i + 1])
         tnw_dist[i] = np.linalg.norm(cat_test_tnw[2 * i] - cat_test_tnw[2 * i + 1])
 
-
     plt.plot(latent_tsne.T[0], latent_tsne.T[1], 'o', cat_test_tsne.T[0], cat_test_tsne.T[1], 'o')
     plt.title('latent')
     plt.show()
 
-
-    plt.plot(tnw_tsne.T[0], tnw_tsne.T[1], 'o', cat_test_tnw.T[0][0], cat_test_tnw.T[1][0], 'o', cat_test_tnw.T[0][1], cat_test_tnw.T[1][1], 'o')
+    plt.plot(tnw_tsne.T[0], tnw_tsne.T[1], 'o', cat_test_tnw.T[0][0], cat_test_tnw.T[1][0], 'o', cat_test_tnw.T[0][1],
+             cat_test_tnw.T[1][1], 'o')
     plt.title('tnw')
     plt.show()
 
-
     # np.save(join(results_dir, 'temp_exp', f'{cat_name}_latent_tsne_dist'), latent_dist)
     # np.save(join(results_dir, 'temp_exp', f'{cat_name}_tnw_tsne_dist'), tnw_dist)
-
-
 
     exit(0)
 
@@ -301,11 +315,11 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
                 cat_tnw = []
 
                 for data in tqdm(dl, total=len(dl)):
-                    partial, remaining, gt, _ = data
-                    partial = partial.to(device)
-                    remaining = remaining.to(device)
+                    existing, missing, gt, _ = data
+                    existing = existing.to(device)
+                    missing = missing.to(device)
 
-                    rec, latent, tnw = full_model(partial, remaining, list(gt.shape), epoch, device)
+                    rec, latent, tnw = full_model(existing, missing, list(gt.shape), epoch, device)
 
                     cat_latent.append(latent.detach().cpu())
                     cat_tnw.append(tnw.detach().cpu())
@@ -341,23 +355,23 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
 
                 np.save(join(results_dir, 'temp_exp', 'gts', f'{cat_name}_{i}'), gt)
 
-                partial_x = gt[gt.T[0].argsort()[1024:]]
-                remaining_x = gt[gt.T[0].argsort()[:1024]]
+                existing_x = gt[gt.T[0].argsort()[1024:]]
+                missing_x = gt[gt.T[0].argsort()[:1024]]
 
-                partial_y = gt[gt.T[1].argsort()[1024:]]
-                remaining_y = gt[gt.T[1].argsort()[:1024]]
+                existing_y = gt[gt.T[1].argsort()[1024:]]
+                missing_y = gt[gt.T[1].argsort()[:1024]]
 
                 gt_shape = list(torch.from_numpy(gt).unsqueeze(0).shape)
 
-                partial = torch.from_numpy(partial_x).unsqueeze(0).to(device)
-                remaining = torch.from_numpy(remaining_x).unsqueeze(0).to(device)
-                _, latent, tnw = full_model(partial, remaining, gt_shape, epoch, device)
+                existing = torch.from_numpy(existing_x).unsqueeze(0).to(device)
+                missing = torch.from_numpy(missing_x).unsqueeze(0).to(device)
+                _, latent, tnw = full_model(existing, missing, gt_shape, epoch, device)
                 cat_latent.append(latent.cpu())
                 cat_tnw.append(tnw.cpu())
 
-                partial = torch.from_numpy(partial_y).unsqueeze(0).to(device)
-                remaining = torch.from_numpy(remaining_y).unsqueeze(0).to(device)
-                _, latent, tnw = full_model(partial, remaining, gt_shape, epoch, device)
+                existing = torch.from_numpy(existing_y).unsqueeze(0).to(device)
+                missing = torch.from_numpy(missing_y).unsqueeze(0).to(device)
+                _, latent, tnw = full_model(existing, missing, gt_shape, epoch, device)
                 cat_latent.append(latent.cpu())
                 cat_tnw.append(tnw.cpu())
 
@@ -407,5 +421,6 @@ experiment_functions_dict = {
     'compute_mmd_tmd_uhd': compute_mmd_tmd_uhd,
     'merge_different_categories': merge_different_categories,
     'same_model_different_slices': same_model_different_slices,
+    "completion3d_submission": completion3d_submission,
     "temp_exp": temp_exp
 }

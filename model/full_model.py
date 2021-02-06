@@ -52,18 +52,18 @@ class FullModel(nn.Module):
 
         self.point_generator_config = {'target_network_input': config['target_network_input']}
 
-    def forward(self, partial, remaining, gt_shape, epoch, device, noise=None):
+    def forward(self, existing, missing, gt_shape, epoch, device, noise=None):
 
-        if partial.size(-1) == 3:
-            partial.transpose_(partial.dim() - 2, partial.dim() - 1)
+        if existing.size(-1) == 3:
+            existing.transpose_(existing.dim() - 2, existing.dim() - 1)
 
-        if noise is None and remaining.size(-1) == 3:
-            remaining.transpose_(remaining.dim() - 2, remaining.dim() - 1)
+        if noise is None and missing and missing.size(-1) == 3:
+            missing.transpose_(missing.dim() - 2, missing.dim() - 1)
 
         if gt_shape[-1] == 3:
             gt_shape[1], gt_shape[2] = gt_shape[2], gt_shape[1]
 
-        latent, mu, logvar = self.mode.get_latent(self, partial, remaining, noise)
+        latent, mu, logvar = self.mode.get_latent(self, existing, missing, noise)
 
         target_networks_weights = self.hyper_network(latent)
         reconstruction = torch.zeros(gt_shape).to(device)
@@ -86,7 +86,7 @@ class FullModel(nn.Module):
 
 class ModelMode(object):
 
-    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+    def get_latent(self, model: FullModel, existing, missing, noise=None):
         raise NotImplementedError
 
     def get_parameters(self, model: FullModel) -> Iterator[Parameter]:
@@ -98,18 +98,18 @@ class ModelMode(object):
 
 class HyperPocket(ModelMode):
 
-    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+    def get_latent(self, model: FullModel, existing, missing, noise=None):
         if model.training:
-            codes, mu, logvar = model.random_encoder(remaining)
-            real_mu = model.real_encoder(partial)
+            codes, mu, logvar = model.random_encoder(missing)
+            real_mu = model.real_encoder(existing)
             latent = torch.cat([codes, real_mu], 1)
             return latent, mu, logvar
         else:
             if noise is None:
-                _, random_mu, _ = model.random_encoder(remaining)
+                _, random_mu, _ = model.random_encoder(missing)
             else:
                 random_mu = noise
-            real_mu = model.real_encoder(partial)
+            real_mu = model.real_encoder(existing)
             latent = torch.cat([random_mu, real_mu], 1)
             return latent, None, None
 
@@ -124,8 +124,8 @@ class HyperPocket(ModelMode):
 
 class HyperRec(ModelMode):
 
-    def get_latent(self, model: FullModel, partial, remaining, noise=None):
-        return model.real_encoder(partial), None, None
+    def get_latent(self, model: FullModel, existing, missing, noise=None):
+        return model.real_encoder(existing), None, None
 
     def get_parameters(self, model: FullModel):
         return chain(model.real_encoder.parameters(), model.hyper_network.parameters())
@@ -136,12 +136,12 @@ class HyperRec(ModelMode):
 
 class HyperCloud(ModelMode):
 
-    def get_latent(self, model: FullModel, partial, remaining, noise=None):
+    def get_latent(self, model: FullModel, existing, missing, noise=None):
         if model.training:
-            return model.random_encoder(partial)
+            return model.random_encoder(existing)
         else:
             if noise is None:
-                _, random_mu, _ = model.random_encoder(partial)
+                _, random_mu, _ = model.random_encoder(existing)
             else:
                 random_mu = noise
             return random_mu, None, None

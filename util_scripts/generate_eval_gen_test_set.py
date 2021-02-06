@@ -6,7 +6,6 @@ from tqdm import tqdm
 from core.arg_parser import parse_config
 from datasets.utils.dataset_generator import HyperPlane
 from utils.plyfile import load_ply, quick_save_ply_file
-from utils.util import show_3d_cloud
 
 
 def div_left_right_bin_search(dataset_dir, init_plane_points, pc_paths):

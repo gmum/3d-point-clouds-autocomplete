@@ -48,7 +48,7 @@ class RealDataNPYDataset(BaseDataset):
             raise ValueError("Dataset does not include scenes")
 
     def get_obj_box(self, idx):
-        if self.scenes:
+        if self.boxes:
             return np.load(join(self.root_dir, self.boxes[idx])).astype(np.float32)
         else:
             raise ValueError("Dataset does not include object boxes")

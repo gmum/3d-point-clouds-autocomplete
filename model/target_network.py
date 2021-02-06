@@ -6,7 +6,7 @@ class TargetNetwork(nn.Module):
     def __init__(self, config, weights):
         super().__init__()
 
-        # self.z_size = config['remaining_size']
+        # self.z_size = config['missing_size']
         self.use_bias = config['use_bias']
         # target network layers out channels
         out_ch = config['layer_out_channels']
