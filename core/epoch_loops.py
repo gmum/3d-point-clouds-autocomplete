@@ -68,8 +68,8 @@ def val_epoch(epoch, full_model, device, loaders_dict, val_classes_names, loss_f
 
                 loss += loss_our_cd.item()
 
-            existing = existing.cpu().numpy()
-            gt = gt.cpu().numpy()
+            existing = existing.detach().cpu().numpy()
+            gt = gt.detach().cpu().numpy()
             reconstruction = reconstruction.detach().cpu().numpy()
 
             val_samples[cat_name] = (existing[0], gt[0], reconstruction[0])
