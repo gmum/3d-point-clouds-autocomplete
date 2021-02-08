@@ -1,0 +1,123 @@
+{
+    "mode": "training",
+    "dataset": {
+        "name": "completion",
+        "path": "data/dataset/completion",
+        "classes": [],
+        "is_rotated": false,
+        "num_samples": 1,
+	"gen_test_set": true
+    },
+    "training": {
+        "optimizer": {
+            "type": "Adam",
+            "hyperparams": {
+                "lr": 0.0001,
+                "weight_decay": 0,
+                "betas": [
+                    0.9,
+                    0.999
+                ],
+                "amsgrad": false
+            }
+        },
+        "lr_scheduler": {
+            "type": "StepLR",
+            "hyperparams": {
+                "step_size": 41,
+                "gamma": 0.01
+            }
+        },
+        "dataloader": {
+            "train": {
+                "batch_size": 66,
+                "shuffle": true,
+                "num_workers" : 8,
+                "drop_last" : true
+            },
+            "val": {
+                "batch_size": 10,
+                "shuffle": true,
+                "num_workers" : 8,
+                "drop_last" : false
+            }
+        },
+        "state_save_frequency" : 10,
+        "loss_coef": 0.05,
+	"min_save_epoch": 20,
+        "max_epoch": 100
+    },
+    "experiments": {
+	"epoch": "best_val",
+	"settings": {
+            "fixed": {
+                "execute": false,
+                "mean": 0.0,
+                "std": 0.05,
+                "amount": 64,
+                "triangulation_config": {
+                    "execute": false,
+                    "method": "edge",
+                    "depth": 2
+                }
+            },
+            "evaluate_generativity": {
+                "execute": false,
+                "batch_size": 150,
+                "num_workers" : 8
+            },
+	    "compute_mmd_tmd_uhd": {
+                "execute": false
+            },
+	    "completion3d_submission":{
+		"execute": true,
+		"batch_size": 16	
+	    }
+	}
+    },
+    "full_model": {
+        "random_encoder": {
+            "output_size": 0,
+            "use_bias": true,
+            "relu_slope": 0.2
+        },
+        "real_encoder": {
+            "output_size": 128,
+            "use_bias": true,
+            "relu_slope": 0.2
+        },
+        "hyper_network": {
+            "use_bias": true,
+            "relu_slope": 0.2
+        },
+        "target_network": {
+            "use_bias": true,
+            "relu_slope": 0.2,
+            "freeze_layers_learning": false,
+            "layer_out_channels": [
+                32,
+                64,
+                128,
+                64
+            ]
+        },
+        "target_network_input": {
+            "constant": false,
+            "normalization": {
+                "enable": true,
+                "type": "progressive",
+                "epoch": 100
+            }
+        }
+    },
+    "setup": {
+        "seed": 2020,
+        "gpu_id": 0
+    },
+    "telegram_logger": {
+        "enable": false,
+        "bot_token": "",
+        "chat_id": ""
+    },
+    "results_root": "data/results"
+}
