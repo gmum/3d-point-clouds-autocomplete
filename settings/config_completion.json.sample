@@ -46,7 +46,7 @@
     },
     "experiments": {
 	"epoch": "best_val",
-	"settings": {
+	    "settings": {
             "fixed": {
                 "execute": false,
                 "mean": 0.0,
@@ -63,14 +63,14 @@
                 "batch_size": 150,
                 "num_workers" : 8
             },
-	    "compute_mmd_tmd_uhd": {
-                "execute": false
+            "compute_mmd_tmd_uhd": {
+                    "execute": false
             },
-	    "completion3d_submission":{
-		"execute": true,
-		"batch_size": 16	
+            "completion3d_submission":{
+                "execute": true,
+                "batch_size": 16
+            }
 	    }
-	}
     },
     "full_model": {
         "random_encoder": {
@@ -92,10 +92,7 @@
             "relu_slope": 0.2,
             "freeze_layers_learning": false,
             "layer_out_channels": [
-                32,
-                64,
-                128,
-                64
+                32, 64, 128, 64
             ]
         },
         "target_network_input": {
