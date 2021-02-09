@@ -22,47 +22,49 @@ from utils.metrics import compute_all_metrics, jsd_between_point_cloud_sets
 from utils.pcutil import plot_3d_point_cloud
 
 
-def fixed(full_model: FullModel, device, dataset, results_dir: str, epoch, amount=30, mean=0.0, std=0.015,
+def fixed(full_model: FullModel, device, datasets_dict, results_dir: str, epoch, amount=30, mean=0.0, std=0.015,
           noises_per_item=10, batch_size=8, save_plots=False,
           triangulation_config={'execute': False, 'method': 'edge', 'depth': 2}):
     # clean dir
     shutil.rmtree(join(results_dir, 'fixed'), ignore_errors=True)
     os.makedirs(join(results_dir, 'fixed'), exist_ok=True)
 
-    dataloader = DataLoader(dataset, batch_size=batch_size)
-    for i, data in tqdm(enumerate(dataloader), total=len(dataloader)):
+    dataloaders_dict = {cat_name: DataLoader(cat_ds, pin_memory=True, batch_size=batch_size)
+                        for cat_name, cat_ds in datasets_dict.items()}
+    for cat_name, dl in dataloaders_dict.items():
 
-        existing, _, _, idx = data
-        existing = existing.to(device)
+        for i, data in tqdm(enumerate(dl), total=len(dl)):
 
-        for j in range(noises_per_item):
-            fixed_noise = torch.zeros(existing.shape[0], full_model.get_noise_size()).normal_(mean=mean, std=std).to(
-                device)
+            existing, _, _, idx = data
+            existing = existing.to(device)
 
-            reconstruction = full_model(existing, None, [existing.shape[0], 2048, 3], epoch, device,
-                                        noise=fixed_noise).cpu()
-            for k in range(reconstruction.shape[0]):
-                np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_{j}_reconstruction'),
-                        reconstruction[k].numpy())
+            for j in range(noises_per_item):
+                fixed_noise = torch.zeros(existing.shape[0], full_model.get_noise_size()).normal_(mean=mean, std=std).to(
+                    device)
+                reconstruction = full_model(existing, None, [existing.shape[0], 2048, 3], epoch, device,
+                                            noise=fixed_noise).cpu()
+                for k in range(reconstruction.shape[0]):
+                    np.save(join(results_dir, 'fixed', f'{cat_name}_{i * batch_size + k}_{j}_reconstruction'),
+                            reconstruction[k].numpy())
+                    if save_plots:
+                        fig = plot_3d_point_cloud(reconstruction[k][0], reconstruction[k][1], reconstruction[k][2],
+                                                  in_u_sphere=True, show=False)
+                        fig.savefig(join(results_dir, 'fixed', f'{cat_name}_{i * batch_size + k}_{j}_fixed_reconstructed.png'))
+                        plt.close(fig)
+                    # np.save(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_noise'), np.array(fixed_noise[k].cpu().numpy()))
+
+                # dataset.inverse_scale_to_scene(idx, reconstruction.T.numpy())
+
+                # np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'),
+                #        dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to existing data fixed experiment
+
+            existing = existing.cpu()
+            for k in range(existing.shape[0]):
+                np.save(join(results_dir, 'fixed', f'{cat_name}_{i * batch_size + k}_existing'), np.array(existing[k].cpu().numpy()))
                 if save_plots:
-                    fig = plot_3d_point_cloud(reconstruction[k][0], reconstruction[k][1], reconstruction[k][2],
-                                              in_u_sphere=True, show=False)
-                    fig.savefig(join(results_dir, 'fixed', f'{i * batch_size + k}_{j}_fixed_reconstructed.png'))
+                    fig = plot_3d_point_cloud(existing[k][0], existing[k][1], existing[k][2], in_u_sphere=True, show=False)
+                    fig.savefig(join(results_dir, 'fixed', f'{cat_name}_{i * batch_size + k}_existing.png'))
                     plt.close(fig)
-                # np.save(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_noise'), np.array(fixed_noise[k].cpu().numpy()))
-
-            # dataset.inverse_scale_to_scene(idx, reconstruction.T.numpy())
-
-            # np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'),
-            #        dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to existing data fixed experiment
-
-        existing = existing.cpu()
-        for k in range(existing.shape[0]):
-            np.save(join(results_dir, 'fixed', f'{i * batch_size + k}_existing'), np.array(existing[k].cpu().numpy()))
-            if save_plots:
-                fig = plot_3d_point_cloud(existing[k][0], existing[k][1], existing[k][2], in_u_sphere=True, show=False)
-                fig.savefig(join(results_dir, 'fixed', f'{i * batch_size + k}_existing.png'))
-                plt.close(fig)
 
 
 def evaluate_generativity(full_model: FullModel, device, datasets_dict, results_dir, epoch, batch_size, num_workers,

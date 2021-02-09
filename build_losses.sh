@@ -8,4 +8,4 @@ rm -rf build || true
 
 python setup.py build
 
-cp "build/lib.linux-x86_64-$PYTHON_VERSION"/* .
+cp `find build/lib* -name "StructuralLossesBackend*"` .

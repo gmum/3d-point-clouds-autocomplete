@@ -150,3 +150,9 @@ class ShapeNet3DEPNDataset(BaseDataset):
         return {synth_id_to_category[category_id]: ShapeNet3DEPNDataset(root_dir=root_dir, split='val',
                                                                         classes=[category_id])
                 for category_id in classes}
+
+    @classmethod
+    def get_test_datasets(cls, root_dir, classes=[], **kwargs):
+        return {synth_id_to_category[category_id]: ShapeNet3DEPNDataset(root_dir=root_dir, split='test',
+                                                                        classes=[category_id])
+                for category_id in classes}

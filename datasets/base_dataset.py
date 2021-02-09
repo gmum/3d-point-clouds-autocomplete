@@ -10,3 +10,7 @@ class BaseDataset(Dataset):
     @classmethod
     def get_validation_datasets(cls, root_dir, classes=[], **kwargs):
         raise NotImplementedError
+
+    @classmethod
+    def get_test_datasets(cls, root_dir, classes=[], **kwargs):
+        raise NotImplementedError

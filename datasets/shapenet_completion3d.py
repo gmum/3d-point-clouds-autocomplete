@@ -65,3 +65,6 @@ class ShapeNetCompletion3DDataset(BaseDataset):
                                                                                model_list=model_list)
                 for category_id, model_list in model_lists.items()}
 
+    @classmethod
+    def get_test_datasets(cls, root_dir, classes=[], **kwargs):
+        return {'all': ShapeNetCompletion3DDataset(root_dir=root_dir, split='test')}
