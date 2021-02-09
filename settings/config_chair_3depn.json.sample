@@ -1,9 +1,10 @@
 {
     "mode": "training",
     "dataset": {
-        "name": "completion",
-        "path": "data/dataset/completion",
-        "classes": []
+        "name": "3depn",
+        "path": "data/dataset/3depn",
+        "classes": ["03001627"],
+        "num_samples": 4
     },
     "training": {
         "optimizer": {
@@ -21,19 +22,19 @@
         "lr_scheduler": {
             "type": "StepLR",
             "hyperparams": {
-                "step_size": 41,
+                "step_size": 30001,
                 "gamma": 0.01
             }
         },
         "dataloader": {
             "train": {
-                "batch_size": 66,
+                "batch_size": 64,
                 "shuffle": true,
                 "num_workers" : 8,
                 "drop_last" : true
             },
             "val": {
-                "batch_size": 10,
+                "batch_size": 60,
                 "shuffle": true,
                 "num_workers" : 8,
                 "drop_last" : false
@@ -41,16 +42,16 @@
         },
         "state_save_frequency" : 10,
         "loss_coef": 0.05,
-	"min_save_epoch": 20,
-        "max_epoch": 100
+	"min_save_epoch": 10,
+        "max_epoch": 2000
     },
     "experiments": {
 	"epoch": "best_val",
 	"settings": {
             "fixed": {
-                "execute": false,
+                "execute": true,
                 "mean": 0.0,
-                "std": 0.05,
+                "std": 0.13,
                 "amount": 64,
                 "triangulation_config": {
                     "execute": false,
@@ -64,17 +65,13 @@
                 "num_workers" : 8
             },
 	    "compute_mmd_tmd_uhd": {
-                "execute": false
-            },
-	    "completion3d_submission":{
-		"execute": true,
-		"batch_size": 16	
-	    }
+                "execute": true
+            }
 	}
     },
     "full_model": {
         "random_encoder": {
-            "output_size": 0,
+            "output_size": 128,
             "use_bias": true,
             "relu_slope": 0.2
         },
@@ -108,7 +105,7 @@
         }
     },
     "setup": {
-        "seed": 2020,
+        "seed": 1856,
         "gpu_id": 0
     },
     "telegram_logger": {

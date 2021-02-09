@@ -27,8 +27,6 @@ class ShapeNetDataset(BaseDataset):
         self.num_samples = num_samples
         self.is_gen = is_gen
 
-        # self._maybe_make_slices()
-
         if self.use_list_with_name is not None:
 
             if self.use_list_with_name == 'pcn':
@@ -88,6 +86,7 @@ class ShapeNetDataset(BaseDataset):
         scan_idx = str(idx % self.num_samples)
 
         if self.is_gen:
+            # TODO ensure it is test set
             existing = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'right', pc_category, pc_filename)), 1024)
             missing = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'left', pc_category, pc_filename)), 1024)
             gt = load_ply(join(self.root_dir, 'test_gen', 'gt', pc_category, pc_filename))
@@ -102,20 +101,6 @@ class ShapeNetDataset(BaseDataset):
             gt = gt @ random_rotation_matrix
 
         return existing, missing, gt, synth_id_to_number[pc_category]
-
-    def _maybe_make_slices(self):
-        if exists(self.root_dir + '/slices'):
-            return
-
-        print("Generating slices...")
-
-        for category in synth_id_to_category.keys():
-            os.makedirs(self.root_dir + '/slices/existing/' + category, exist_ok=True)
-            os.makedirs(self.root_dir + '/slices/missing/' + category, exist_ok=True)
-
-        # SlicedDatasetGenerator(self.root_dir, self.transform).generate(self._get_names(self.root_dir).iterrows())
-
-        print("Dataset generated")
 
     @classmethod
     def _get_datasets_for_classes(cls, root_dir, split, classes=[], **kwargs):
