@@ -1,6 +1,4 @@
-import os
-from os import listdir
-from os.path import exists, join
+from os.path import join
 
 import numpy as np
 import pandas as pd
@@ -8,14 +6,13 @@ import pandas as pd
 from datasets.base_dataset import BaseDataset
 from datasets.utils.shapenet_category_mapping import synth_id_to_category, category_to_synth_id, synth_id_to_number
 from utils.plyfile import load_ply
-from datasets.utils.dataset_generator import SlicedDatasetGenerator
 from utils.util import resample_pcd, get_filenames_by_cat
 
 
 class ShapeNetDataset(BaseDataset):
 
     def __init__(self, root_dir='/home/datasets/shapenet', split='train', classes=[],
-                 is_random_rotated=False, num_samples=4, use_list_with_name='pcn', is_gen=False):
+                 is_random_rotated=False, num_samples=4, use_pcn_model_list=True, is_gen=False):
         """
         Args:
             root_dir (string): Directory with all the point clouds.
@@ -23,19 +20,15 @@ class ShapeNetDataset(BaseDataset):
         super().__init__(root_dir, split, classes)
 
         self.is_random_rotated = is_random_rotated
-        self.use_list_with_name = use_list_with_name
-        self.num_samples = num_samples
+        self.use_pcn_model_list = use_pcn_model_list
         self.is_gen = is_gen
+        self.num_samples = num_samples
 
-        if self.use_list_with_name is not None:
+        if is_gen:
+            self.num_samples = 1
 
-            if self.use_list_with_name == 'pcn':
-                list_path = join(root_dir, self.split +'.list')
-            elif self.use_list_with_name == 'msc':
-                list_path = join(root_dir, self.split + '_msc.list')
-            else:
-                raise ValueError('use_list_with_name can have only values `pcn` or `msc`')
-
+        if self.use_pcn_model_list:
+            list_path = join(root_dir, self.split +'.list')
             with open(list_path) as file:
                 if classes:
                     self.point_clouds_names = [line.strip() for line in file if line.strip().split('/')[0] in classes]
@@ -71,8 +64,7 @@ class ShapeNetDataset(BaseDataset):
         return len(self.point_clouds_names) * self.num_samples
 
     def __getitem__(self, idx):
-
-        if self.use_list_with_name is not None:
+        if self.use_pcn_model_list:
             pc_category, pc_filename = self.point_clouds_names[idx // self.num_samples].split('/')
             pc_filename += '.ply'
         else:
@@ -85,8 +77,7 @@ class ShapeNetDataset(BaseDataset):
 
         scan_idx = str(idx % self.num_samples)
 
-        if self.is_gen:
-            # TODO ensure it is test set
+        if self.is_gen and self.split == 'test':
             existing = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'right', pc_category, pc_filename)), 1024)
             missing = resample_pcd(load_ply(join(self.root_dir, 'test_gen', 'left', pc_category, pc_filename)), 1024)
             gt = load_ply(join(self.root_dir, 'test_gen', 'gt', pc_category, pc_filename))
@@ -110,7 +101,6 @@ class ShapeNetDataset(BaseDataset):
                            '04530566']
             else:
                 classes = list(synth_id_to_category.keys())
-
         return {synth_id_to_category[category_id]: ShapeNetDataset(root_dir=root_dir,
                                                                    split=split,
                                                                    classes=[category_id], **kwargs)

@@ -8,17 +8,17 @@ def get_datasets(config):
     if dataset_name == 'shapenet':
         train_dataset = ShapeNetDataset(root_dir=config['path'], classes=config['classes'], split='train',
                                         is_random_rotated=config['is_rotated'], num_samples=config['num_samples'],
-                                        use_list_with_name='pcn')
+                                        use_pcn_model_list=True)
         val_dataset_dict = ShapeNetDataset.get_validation_datasets(root_dir=config['path'],
                                                                    classes=config['classes'],
                                                                    is_random_rotated=config['is_rotated'],
                                                                    num_samples=config['num_samples'],
-                                                                   use_list_with_name='pcn')
+                                                                   use_pcn_model_list=True)
         test_dataset_dict = ShapeNetDataset.get_test_datasets(root_dir=config['path'],
                                                               classes=config['classes'],
                                                               is_random_rotated=config['is_rotated'],
                                                               num_samples=config['num_samples'],
-                                                              use_list_with_name='pcn',
+                                                              use_pcn_model_list=True,
                                                               is_gen=config['gen_test_set'])
     elif dataset_name == 'completion':
         train_dataset = ShapeNetCompletion3DDataset(root_dir=config['path'], split='train', classes=config['classes'])
