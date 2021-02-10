@@ -24,7 +24,7 @@
         "lr_scheduler": {
             "type": "StepLR",
             "hyperparams": {
-                "step_size": 3000,
+                "step_size": 30001,
                 "gamma": 0.01
             }
         },
@@ -44,7 +44,7 @@
         },
         "state_save_frequency" : 1,
         "loss_coef": 0.05,
-        "max_epoch": 2000
+        "max_epoch": 230
     },
     "experiments": {
         "epoch": "best_val",
@@ -70,12 +70,12 @@
 
     "full_model": {
         "random_encoder": {
-            "output_size": 1024,
+            "output_size": 128,
             "use_bias": true,
             "relu_slope": 0.2
         },
         "real_encoder": {
-            "output_size": 1024,
+            "output_size": 128,
             "use_bias": true,
             "relu_slope": 0.2
         },
