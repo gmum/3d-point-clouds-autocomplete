@@ -1,6 +1,5 @@
 from itertools import chain
 from typing import Iterator
-from enum import Enum
 
 import torch
 import torch.nn as nn

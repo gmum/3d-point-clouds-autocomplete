@@ -247,40 +247,16 @@ def completion3d_submission(full_model, device, datasets_dict, results_dir, epoc
             submission_zip.write(ofile, 'all/' + basename(ofile))
 
 
-def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
-    pass
+def make_tsne_reduction(full_model, device, dataset_dict, results_dir, epoch):
+    '''
+        this experiment requires changing model.full_model.py:FullModel#forward method return to
+        reconstruction, latent, target_networks_weights
+    '''
+
+    from datasets.shapenet import ShapeNetDataset
 
     cat_name = 'car'
     amount = 100
-
-    latent_tsne = np.load(join(results_dir, 'temp_exp', f'{cat_name}_latent_tsne.npy'))
-    tnw_tsne = np.load(join(results_dir, 'temp_exp', f'{cat_name}_tnw_tsne.npy'))
-
-    cat_test_tsne = latent_tsne[-(2 * amount):]
-    cat_test_tnw = tnw_tsne[-(2 * amount):]
-
-    latent_dist = np.zeros(amount)
-    tnw_dist = np.zeros(amount)
-
-    for i in range(amount):
-        latent_dist[i] = np.linalg.norm(cat_test_tsne[2 * i] - cat_test_tsne[2 * i + 1])
-        tnw_dist[i] = np.linalg.norm(cat_test_tnw[2 * i] - cat_test_tnw[2 * i + 1])
-
-    plt.plot(latent_tsne.T[0], latent_tsne.T[1], 'o', cat_test_tsne.T[0], cat_test_tsne.T[1], 'o')
-    plt.title('latent')
-    plt.show()
-
-    plt.plot(tnw_tsne.T[0], tnw_tsne.T[1], 'o', cat_test_tnw.T[0][0], cat_test_tnw.T[1][0], 'o', cat_test_tnw.T[0][1],
-             cat_test_tnw.T[1][1], 'o')
-    plt.title('tnw')
-    plt.show()
-
-    # np.save(join(results_dir, 'temp_exp', f'{cat_name}_latent_tsne_dist'), latent_dist)
-    # np.save(join(results_dir, 'temp_exp', f'{cat_name}_tnw_tsne_dist'), tnw_dist)
-
-    exit(0)
-
-    from datasets.shapenet import ShapeNetDataset
 
     train_dataset_dict = ShapeNetDataset._get_datasets_for_classes(
         'D:\\UJ\\bachelors\\3d-point-clouds-autocomplete\\data\\shapenet',
@@ -294,34 +270,25 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
     is_compute = False
 
     with torch.no_grad():
-
         latents = {}
         tnws = {}
-
         if is_compute:
             dataloaders_dict = {cat_name: DataLoader(cat_ds, pin_memory=True, batch_size=1, num_workers=0)
                                 for cat_name, cat_ds in train_dataset_dict.items()}
             for cat_name, dl in dataloaders_dict.items():
-
                 if cat_name != 'car':
                     continue
-
                 cat_latent = []
                 cat_tnw = []
-
                 for data in tqdm(dl, total=len(dl)):
                     existing, missing, gt, _ = data
                     existing = existing.to(device)
                     missing = missing.to(device)
-
                     rec, latent, tnw = full_model(existing, missing, list(gt.shape), epoch, device)
-
                     cat_latent.append(latent.detach().cpu())
                     cat_tnw.append(tnw.detach().cpu())
-
                 latents[cat_name] = torch.cat(cat_latent).numpy()
                 tnws[cat_name] = torch.cat(cat_tnw).numpy()
-
             latents['all'] = np.concatenate([v for v in latents.values()])
             tnws['all'] = np.concatenate([v for v in tnws.values()])
 
@@ -398,16 +365,33 @@ def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
 
             np.save(join(results_dir, 'temp_exp', f'{cat_name}_tnw_tsne'), tnw_tsne)
 
-        '''
-        
-        latent_tsne = {cat: manifold.TSNE(n_components=2, init='pca').fit_transform(latent) for cat, latent in latents.items()}
+        latent_tsne = np.load(join(results_dir, 'temp_exp', f'{cat_name}_latent_tsne.npy'))
+        tnw_tsne = np.load(join(results_dir, 'temp_exp', f'{cat_name}_tnw_tsne.npy'))
 
-        for c, l in latent_tsne.items():
-            plt.plot(l.T[0], l.T[1], 'o')
-            plt.title(c)
-            plt.show()
-        pass
-        '''
+        cat_test_tsne = latent_tsne[-(2 * amount):]
+        cat_test_tnw = tnw_tsne[-(2 * amount):]
+
+        latent_dist = np.zeros(amount)
+        tnw_dist = np.zeros(amount)
+
+        for i in range(amount):
+            latent_dist[i] = np.linalg.norm(cat_test_tsne[2 * i] - cat_test_tsne[2 * i + 1])
+            tnw_dist[i] = np.linalg.norm(cat_test_tnw[2 * i] - cat_test_tnw[2 * i + 1])
+
+        plt.plot(latent_tsne.T[0], latent_tsne.T[1], 'o', cat_test_tsne.T[0], cat_test_tsne.T[1], 'o')
+        plt.title('latent')
+        plt.show()
+
+        plt.plot(tnw_tsne.T[0], tnw_tsne.T[1], 'o', cat_test_tnw.T[0][0], cat_test_tnw.T[1][0], 'o',
+                 cat_test_tnw.T[0][1],
+                 cat_test_tnw.T[1][1], 'o')
+        plt.title('tnw')
+        plt.show()
+
+
+def temp_exp(full_model, device, dataset_dict, results_dir, epoch):
+    # you may write your experiment here
+    pass
 
 
 experiment_functions_dict = {
