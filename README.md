@@ -35,9 +35,9 @@ Create and activate your conda env:
 - go to the project dir
 
 Install requirements:
-- run `conda install pytorch torchvision torchaudio cudatoolkit=<your CUDA version (ex. 10.2)> -c pytorch`
+- run `conda install pytorch torchvision torchaudio cudatoolkit=<your CUDA version (e.g., 10.2)> -c pytorch`
 - run `pip install -r requirements.txt`
-- set your CUDA_HOME by the command: `export CUDA_HOME=... # e.g. /var/lib/cuda-10.2/`
+- set your CUDA_HOME by the command: `export CUDA_HOME=... # e.g., /var/lib/cuda-10.2/`
 - install CUDA extension by running `./build_losses.sh` 
 
 
@@ -54,10 +54,10 @@ We use four datasets in our paper.
      
      Download it from the [link](http://127.0.0.1) or generate by yourself:
      1) Please download the partial scan point cloud data from [the website](http://kaldir.vc.in.tum.de/adai/CNNComplete/shapenet_dim32_sdf_pc.zip) 
-     and extract it into the folder for storing the dataset (e.g., `${project_path}/data/datasets/3depn`). 
+     and extract it into the folder for storing the dataset (e.g., `${project_path}/data/dataset/3depn`). 
      2) For the complete point clouds data, please download it from [PKU disk](https://disk.pku.edu.cn:443/link/9A3E1AC9FBA4DEBD705F028650CBE8C7) 
      (provided by [MSC](https://github.com/ChrisWu1997/Multimodal-Shape-Completion)) and extract it into the same folder.
-     3) copy `splits/3depn/shapenet-official-split.csv` to this folder
+     3) copy `splits/3depn/shapenet-official-split.csv` file to that folder
      4) (if you haven't done it earlier) make a copy of the sample configs by executing 
         
         `cp setting/config.json.sample setting/config.json`
