@@ -1,5 +1,3 @@
-# TODO rename to experiments.py
-import glob
 import os
 import shutil
 from datetime import datetime
@@ -52,11 +50,6 @@ def fixed(full_model: FullModel, device, datasets_dict, results_dir: str, epoch,
                         fig.savefig(join(results_dir, 'fixed', f'{cat_name}_{i * batch_size + k}_{j}_fixed_reconstructed.png'))
                         plt.close(fig)
                     # np.save(join(results_dir, 'fixed', f'{i*batch_size+k}_{j}_fixed_noise'), np.array(fixed_noise[k].cpu().numpy()))
-
-                # dataset.inverse_scale_to_scene(idx, reconstruction.T.numpy())
-
-                # np.save(join(results_dir, 'fixed', f'{i}_{j}_rescaled'),
-                #        dataset.inverse_scale(idx, reconstruction.T.numpy()))  # TODO extract to existing data fixed experiment
 
             existing = existing.cpu()
             for k in range(existing.shape[0]):

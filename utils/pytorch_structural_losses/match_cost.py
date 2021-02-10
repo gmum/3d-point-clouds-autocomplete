@@ -19,7 +19,7 @@ class MatchCostFunction(Function):
         match, temp = ApproxMatch(seta, setb)
         ctx.match = match
         cost = MatchCost(seta, setb, match)
-        # TODO: If you want to return matching matrix too, swap the return lines
+        # If you want to return matching matrix too, swap the return lines
         # Remember to use method `match_cost()` directly, because method
         # `utils.metrics.earth_mover_distance()` will try to divide the tuple by
         # the batch size. We omit the if statement for performance purposes.
