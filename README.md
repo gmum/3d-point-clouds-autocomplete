@@ -1,7 +1,7 @@
 # HyperPocket: Generative Point Cloud Completion
 This repository contains the source code for the paper:
 
-[HyperPocket: Generative Point Cloud Completion](http://127.0.0.1) //TODO change link
+[HyperPocket: Generative Point Cloud Completion](http://127.0.0.1)
 
 ![Overview](images/hyperpocket_arch.png)
 
@@ -44,15 +44,15 @@ Install requirements:
 ## Usage
 **Add project root directory to PYTHONPATH**
 
-```export PYTHONPATH=project_path:$PYTHONPATH```
+```export PYTHONPATH=$(project_path):$PYTHONPATH```
 
 **Download dataset**
 
-We use three datasets in our paper.
+We use four datasets in our paper.
 
 1. 3D-EPN
      
-     //TODO provide link to our dataset
+     Download it from the [link](http://127.0.0.1) or generate by yourself:
      1) Please download the partial scan point cloud data from [the website](http://kaldir.vc.in.tum.de/adai/CNNComplete/shapenet_dim32_sdf_pc.zip) 
      and extract it into the folder for storing the dataset (e.g., `${project_path}/data/datasets/3depn`). 
      2) For the complete point clouds data, please download it from [PKU disk](https://disk.pku.edu.cn:443/link/9A3E1AC9FBA4DEBD705F028650CBE8C7) 
@@ -69,12 +69,16 @@ We use three datasets in our paper.
         ```
      6) run `python3 util_scripts/generate_partial_dataset.py --config setting/config.json`
 
-2. Completion3D
+2. PartNet
+    
+    1) Please download it from [the official website](https://www.shapenet.org/download/parts) 
+    
+3. Completion3D
     1) Please download it from [the official website](http://download.cs.stanford.edu/downloads/completion3d/dataset2019.zip)
     
-3. MissingShapeNet
-    
-    //TODO provide link to our dataset
+4. MissingShapeNet
+   
+    Download it from the [link](http://127.0.0.1) or generate by yourself:
     1) (if you haven't done it earlier) make a copy of the sample configs by executing 
         
         `cp setting/config.json.sample setting/config.json`
@@ -93,15 +97,15 @@ We use three datasets in our paper.
 We have prepared several settings for working with different datasets:
 ```
 #train single class of 3depn dataset
-config_airplane_3depn.json.sample
-config_chair_3depn.json.sample
-config_table_3depn.json.sample
+config_3depn_airplane.json.sample
+config_3depn_chair.json.sample
+config_3depn_table.json.sample
     
 #train model for the Completion3D benchmark
 config_completion.json.sample
 
 #train MissingShapeNet
-//TODO
+config_missing_shapenet.json.sample
 ```
 
 1) (if you haven't done it earlier) make a copy of the preferred config by executing 
@@ -116,6 +120,16 @@ config_completion.json.sample
 3) exec script
     - run `python3 core/main.py --config settings/config.json`
 
+**Pre-trained Models**
+Pre-trained models can be downloaded from [our Release page](http://127.0.0.1). 
+To use them:
+    
+1) Download the model weights zip file (naming convention is the same as for the configs above).
+2) Extract zip file to your results directory
+3) If you have not train models with sample configs you may set `["experiments]["epoch"]` to `"latest"` 
+   else you need to specify the exac epoch (listed on the release page).
+    
+    
 **Experiments**
 
 1) In case you train the model by yourself, just change `["mode"]` in the config file to `"experiments"`
@@ -126,16 +140,14 @@ otherwise need also to specify fields mentioned above.
 Experiments list:
 - fixed
 - evaluate_generativity
-- compute_mmd_tmd_uhd
+- compute_mmd_tmd_uhd (requires fixed experiment before)
 - merge_different_categories
 - same_model_different_slices
-- completion3d_submission
-
-//TODO think about making description
+- completion3d_submission (generates submission.zip file in your $(project_path) folder)
 
 
 ## Extending
 In case you want create your own experiments: 
 1) write you experiment function in core/experiments
-2) add it to `experiment_functions_dict` in core/exps
+2) add it to `experiment_functions_dict` in core/experiments
 3) include your special parameters into the config file `["experiments]["<your func name>"]` (be sure to add a bool field "execute" there)  
