@@ -1,11 +1,10 @@
 import logging
 from os import makedirs
 from os.path import join, exists
-
 import random
-import numpy as np
 
 import torch
+import numpy as np
 
 from utils.util import get_classes_dir, get_distribution_dir, get_model_name
 
@@ -80,7 +79,6 @@ def weights_init(m):
 
 def restore_model_state(weights_path, metrics_path, gpu_id, epoch, restore_policy, full_model, optimizer=None,
                         scheduler=None):
-
     if restore_policy == "latest":
         pass
     elif restore_policy == "best_val":

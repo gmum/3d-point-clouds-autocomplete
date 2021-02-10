@@ -75,6 +75,15 @@ We use four datasets in our paper.
     
 3. Completion3D
     1) Please download it from [the official website](http://download.cs.stanford.edu/downloads/completion3d/dataset2019.zip)
+    2) Extract it into your folder for datasets (e.g., `${project_path}/data/dataset/completion`)
+    3) (if you haven't done it earlier) make a copy of the sample configs by executing 
+        
+        `cp setting/config.json.sample setting/config.json`
+    4) specify your dataset preferences in `setting/config.json` file:
+        ```
+            ["dataset"]["name"] = "completion" 
+            ["dataset"]["path"] = "<path to your dataset folder>"
+        ```
     
 4. MissingShapeNet
    
@@ -87,6 +96,8 @@ We use four datasets in our paper.
             ["dataset"]["name"] = "shapenet" 
             ["dataset"]["path"] = "<path to the folder for dataset>"
             ["dataset"]["num_samples"] = <how many devisions per a point cloud you would get (in the paper we use 4)>
+            ["dataset"]["is_rotated"] = <set true if you want to get random-rotated point clouds>
+            ["dataset"]["gen_test_set"] = <set true if you want to get a test set with point clouds divided into left and right parts>
         ```
     3) run `python3 util_scripts/download_shapenet_2048.py --config setting/config.json`
     4) run `python3 util_scripts/generate_partial_dataset.py --config setting/config.json`
