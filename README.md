@@ -1,7 +1,7 @@
 # HyperPocket: Generative Point Cloud Completion
 This repository contains the source code for the paper:
 
-[HyperPocket: Generative Point Cloud Completion](http://127.0.0.1)
+[HyperPocket: Generative Point Cloud Completion](https://arxiv.org/abs/2102.05973)
 
 ![Overview](images/hyperpocket_arch.png)
 
