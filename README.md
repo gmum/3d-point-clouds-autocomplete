@@ -52,7 +52,7 @@ We use four datasets in our paper.
 
 1. 3D-EPN
      
-     Download it from the [link](http://127.0.0.1) or generate by yourself:
+     Download it from the [link](https://ujchmura-my.sharepoint.com/:u:/g/personal/przemyslaw_spurek_uj_edu_pl/ESrI4SBeef5MrpxNz3PhUa4BdSw-CQazfPHAPvHDJUzVQw?e=r7w4dc) or generate by yourself:
      1) Please download the partial scan point cloud data from [the website](http://kaldir.vc.in.tum.de/adai/CNNComplete/shapenet_dim32_sdf_pc.zip) 
      and extract it into the folder for storing the dataset (e.g., `${project_path}/data/dataset/3depn`). 
      2) For the complete point clouds data, please download it from [PKU disk](https://disk.pku.edu.cn:443/link/9A3E1AC9FBA4DEBD705F028650CBE8C7) 
@@ -87,7 +87,7 @@ We use four datasets in our paper.
     
 4. MissingShapeNet
    
-    Download it from the [link](http://127.0.0.1) or generate by yourself:
+    Download it from the [link](https://ujchmura-my.sharepoint.com/:u:/g/personal/przemyslaw_spurek_uj_edu_pl/EfNG1CNZwDhDnCJlblwf7r0BvbIRcbhSw5XqR98wXmiWPg?e=fpao42) or generate by yourself:
     1) (if you haven't done it earlier) make a copy of the sample configs by executing 
         
         `cp setting/config.json.sample setting/config.json`
@@ -132,7 +132,7 @@ config_missing_shapenet.json.sample
     - run `python3 core/main.py --config settings/config.json`
 
 **Pre-trained Models**
-Pre-trained models can be downloaded from [our Release page](http://127.0.0.1). 
+Pre-trained models can be downloaded from [our Release page](https://github.com/gmum/3d-point-clouds-autocomplete/releases). 
 To use them:
     
 1) Download the model weights zip file (naming convention is the same as for the configs above).
